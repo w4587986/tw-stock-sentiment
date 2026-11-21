@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-21T08:31:15.307Z",
+  "generatedAt": "2026-11-21T08:50:01.609Z",
   "tradingDate": "2026-11-20",
   "sources": {
     "index": {
@@ -53,10 +53,10 @@
     },
     "accounts": {
       "label": "投資人開戶統計",
-      "status": "error",
-      "records": 0,
-      "endpoint": "",
-      "message": "最近六個月及歷史回補均未成功解析 TWSE 月報。"
+      "status": "ok",
+      "records": 1,
+      "endpoint": "https://www.twse.com.tw/zh/trading/statistics/list02-264.html?date=20261001",
+      "message": "每月累計開戶帳戶數；月淨增減是相鄰月份累計值差額，不等於當月新開戶毛額或獨立投資人數。"
     }
   },
   "normalized": {
@@ -115,9 +115,125 @@
       "message": "採證交所當沖市場統計表；成交股數占比與買賣成交金額占比分開呈現。"
     },
     "accounts": {
-      "status": "error",
+      "status": "ok",
       "label": "投資人開戶統計",
-      "message": "最近六個月及歷史回補均未成功解析 TWSE 月報。"
+      "month": "2026-10",
+      "totalAccounts": 14827469,
+      "age20to30Accounts": 1949858,
+      "age20to30SharePct": 13.15030906488491,
+      "previousMonth": "2026-09",
+      "previousTotalAccounts": 14763301,
+      "netChangeAccounts": 64168,
+      "netChangePct": 0.43464534117403364,
+      "netChange20to30": 19694,
+      "endpoint": "https://www.twse.com.tw/zh/trading/statistics/list02-264.html?date=20261001",
+      "message": "每月累計開戶帳戶數；月淨增減是相鄰月份累計值差額，不等於當月新開戶毛額或獨立投資人數。",
+      "history": [
+        {
+          "month": "2025-10",
+          "totalAccounts": 13662156,
+          "age20to30Accounts": 1747393,
+          "age20to30SharePct": 12.790023770772343,
+          "netChangeAccounts": null,
+          "netChangePct": null
+        },
+        {
+          "month": "2025-11",
+          "totalAccounts": 13714232,
+          "age20to30Accounts": 1766866,
+          "age20to30SharePct": 12.883448376839477,
+          "netChangeAccounts": 52076,
+          "netChangePct": 0.38116970703598874
+        },
+        {
+          "month": "2025-12",
+          "totalAccounts": 13767825,
+          "age20to30Accounts": 1785880,
+          "age20to30SharePct": 12.971402527269193,
+          "netChangeAccounts": 53593,
+          "netChangePct": 0.3907838222366289
+        },
+        {
+          "month": "2026-01",
+          "totalAccounts": 13859121,
+          "age20to30Accounts": 1662086,
+          "age20to30SharePct": 11.992723059420578,
+          "netChangeAccounts": 91296,
+          "netChangePct": 0.6631112757461644
+        },
+        {
+          "month": "2026-02",
+          "totalAccounts": 13939987,
+          "age20to30Accounts": 1689786,
+          "age20to30SharePct": 12.121862093558624,
+          "netChangeAccounts": 80866,
+          "netChangePct": 0.5834857780663061
+        },
+        {
+          "month": "2026-03",
+          "totalAccounts": 14102236,
+          "age20to30Accounts": 1739407,
+          "age20to30SharePct": 12.33426387134636,
+          "netChangeAccounts": 162249,
+          "netChangePct": 1.1639106980515734
+        },
+        {
+          "month": "2026-04",
+          "totalAccounts": 14200794,
+          "age20to30Accounts": 1768696,
+          "age20to30SharePct": 12.454909211414517,
+          "netChangeAccounts": 98558,
+          "netChangePct": 0.6988820779910254
+        },
+        {
+          "month": "2026-05",
+          "totalAccounts": 14332896,
+          "age20to30Accounts": 1808798,
+          "age20to30SharePct": 12.619905984108165,
+          "netChangeAccounts": 132102,
+          "netChangePct": 0.9302437596095059
+        },
+        {
+          "month": "2026-06",
+          "totalAccounts": 14487981,
+          "age20to30Accounts": 1854051,
+          "age20to30SharePct": 12.797166147581226,
+          "netChangeAccounts": 155085,
+          "netChangePct": 1.082021386326959
+        },
+        {
+          "month": "2026-07",
+          "totalAccounts": 14606821,
+          "age20to30Accounts": 1886864,
+          "age20to30SharePct": 12.917690988340311,
+          "netChangeAccounts": 118840,
+          "netChangePct": 0.8202661226571095
+        },
+        {
+          "month": "2026-08",
+          "totalAccounts": 14698250,
+          "age20to30Accounts": 1910896,
+          "age20to30SharePct": 13.000840236082528,
+          "netChangeAccounts": 91429,
+          "netChangePct": 0.6259335963656909
+        },
+        {
+          "month": "2026-09",
+          "totalAccounts": 14763301,
+          "age20to30Accounts": 1930164,
+          "age20to30SharePct": 13.074067920175846,
+          "netChangeAccounts": 65051,
+          "netChangePct": 0.44257649720205183
+        },
+        {
+          "month": "2026-10",
+          "totalAccounts": 14827469,
+          "age20to30Accounts": 1949858,
+          "age20to30SharePct": 13.15030906488491,
+          "netChangeAccounts": 64168,
+          "netChangePct": 0.43464534117403364
+        }
+      ]
     },
     "sentiment": {
       "heatIndex": null,
@@ -142,12 +258,12 @@
         }
       ],
       "dailySamples": 1,
-      "accountMonths": 0,
+      "accountMonths": 13,
       "methodology": "群眾熱度：融資餘額20日變化、上市當沖成交股數占比、月開戶總數淨增率的歷史百分位加權；恐慌程度：下跌家數占比與指數單日跌幅的歷史百分位平均。每日序列至少60筆、月開戶序列至少12期才納入。"
     }
   },
   "historyCount": 1,
-  "accountHistoryCount": 0,
+  "accountHistoryCount": 13,
   "history": [
     {
       "date": "2026-11-20",
@@ -159,7 +275,7 @@
       "marginBalanceYi": 4352.27267,
       "marginChangePct": -10.145396986706567,
       "daytradeSharePct": 26.1,
-      "accountMonth": null,
+      "accountMonth": "2026-10",
       "heatIndex": null,
       "fearIndex": null
     }
