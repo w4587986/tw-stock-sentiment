@@ -141,14 +141,22 @@ async function fetchTwseIndex(date) {
   return parseTwseIndex(body, date);
 }
 async function fetchTwseMargin(date) {
-  const url = 'https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date=' + compact(date) + '&selectType=MS&response=json';
+  // TWSE historical market-wide credit statistics: selectType=MS (信用交易統計).
+  // This endpoint returns creditList, not the per-stock tables returned by marginTrading/MI_MARGN.
+  const url = 'https://www.twse.com.tw/exchangeReport/MI_MARGN?date=' + compact(date) + '&selectType=MS&response=json';
   const body = await fetchJson(url, 'TWSE MI_MARGN ' + date);
+  const returnedDate = rocDate(body.creditTitle || '');
+  if (returnedDate && returnedDate !== date) {
+    throw new Error('報表日期 ' + returnedDate + ' 與查詢日期 ' + date + ' 不一致');
+  }
   const rows = Array.isArray(body.creditList) ? body.creditList : [];
   const row = rows.find(item => String(item?.[0] || '').includes('融資金額'));
-  if (!row) throw new Error('融資金額統計列缺少欄位');
-  // Ignore empty cells exactly as the existing daily workflow does before selecting prior/today balances.
-  const amounts = row.slice(1).map(number).filter(value => value !== null);
-  if (amounts.length < 5) throw new Error('融資金額統計列數值欄位不足');
+  if (!row) throw new Error('回傳未包含融資金額統計列；stat=' + String(body.stat || 'unknown'));
+  // creditList row columns: label, buy, sell, cash redemption, prior balance, current balance.
+  const amounts = row.slice(1).map(number);
+  if (amounts.length < 5 || amounts.slice(0, 5).some(value => value === null)) {
+    throw new Error('融資金額統計列欄位不足：' + JSON.stringify(row));
+  }
   const priorThousand = amounts[3];
   const todayThousand = amounts[4];
   if (!(priorThousand > 0) || !(todayThousand > 0)) throw new Error('融資餘額數值無效');
