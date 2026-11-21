@@ -1,11 +1,27 @@
 [
   {
+    "month": "2025-08",
+    "totalAccounts": 13567161,
+    "age20to30Accounts": 1709556,
+    "age20to30SharePct": 12.600690741415981,
+    "netChangeAccounts": null,
+    "netChangePct": null
+  },
+  {
+    "month": "2025-09",
+    "totalAccounts": 13613013,
+    "age20to30Accounts": 1727834,
+    "age20to30SharePct": 12.692517079062512,
+    "netChangeAccounts": 45852,
+    "netChangePct": 0.3379631154962981
+  },
+  {
     "month": "2025-10",
     "totalAccounts": 13662156,
     "age20to30Accounts": 1747393,
     "age20to30SharePct": 12.790023770772343,
-    "netChangeAccounts": null,
-    "netChangePct": null
+    "netChangeAccounts": 49143,
+    "netChangePct": 0.36100016947020475
   },
   {
     "month": "2025-11",
