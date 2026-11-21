@@ -8,8 +8,8 @@ on:
       - '.github/workflows/update-market-data.yml'
   workflow_dispatch:
   schedule:
-    # 09:30 UTC = 17:30 Asia/Taipei, Monday-Friday.
-    - cron: '30 9 * * 1-5'
+    # 14:00 UTC = 22:00 Asia/Taipei. TWSE day-trading statistics are published later than the regular close.
+    - cron: '0 14 * * 1-5'
 
 permissions:
   contents: write
@@ -28,14 +28,15 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
+          package-manager-cache: false
 
-      - name: Fetch public market data and create JSON snapshot
+      - name: Fetch official data and calculate indicators
         run: |
           mkdir -p data
           node --input-type=module <<'NODE'
@@ -45,15 +46,31 @@ jobs:
           const SOURCES = [
             { key: 'index', label: '加權指數', url: `${BASE}/exchangeReport/MI_INDEX` },
             { key: 'stocks', label: '上市股票日成交資訊', url: `${BASE}/exchangeReport/STOCK_DAY_ALL` },
-            { key: 'margin', label: '上市融資融券明細', url: `${BASE}/exchangeReport/MI_MARGN` },
-            { key: 'daytrade', label: '上市當沖統計', url: `${BASE}/exchangeReport/TWTB4U` },
+            { key: 'marginDetails', label: '上市個股融資融券明細', url: `${BASE}/exchangeReport/MI_MARGN` },
+            { key: 'daytradeDetails', label: '上市個股當沖明細', url: `${BASE}/exchangeReport/TWTB4U` },
             { key: 'tpex', label: '上櫃股票收盤行情', url: 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes' }
           ];
 
-          const num = value => {
+          const now = new Date();
+          const taipeiDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+          const [yyyy, mm, dd] = taipeiDate.split('-').map(Number);
+          const todayMonth = `${yyyy}-${String(mm).padStart(2, '0')}`;
+          const toCompact = date => date.replaceAll('-', '');
+          const monthShift = (year, month, delta) => {
+            const d = new Date(Date.UTC(year, month - 1 + delta, 1));
+            return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, key: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}` };
+          };
+          const rocDate = value => {
+            const s = String(value || '').trim();
+            let m = s.match(/(\d{2,3})\s*[\/.-]\s*(\d{1,2})\s*[\/.-]\s*(\d{1,2})/);
+            if (!m) m = s.match(/(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+            if (!m) return null;
+            return `${Number(m[1]) + 1911}-${String(Number(m[2])).padStart(2, '0')}-${String(Number(m[3])).padStart(2, '0')}`;
+          };
+          const toNumber = value => {
             if (value === null || value === undefined) return null;
-            const s = String(value).replace(/,/g, '').replace(/％|%/g, '').trim();
-            if (!s || s === '--' || s === '-' || s === 'X') return null;
+            const s = String(value).replace(/,/g, '').replace(/[％%]/g, '').replace(/\s/g, '').trim();
+            if (!s || ['--', '-', 'X', 'N/A'].includes(s)) return null;
             const n = Number(s);
             return Number.isFinite(n) ? n : null;
           };
@@ -61,47 +78,220 @@ jobs:
             if (!row) return null;
             for (const [key, value] of Object.entries(row)) {
               if (patterns.some(p => p.test(key))) {
-                const n = num(value);
+                const n = toNumber(value);
                 if (n !== null) return { key, value: n, raw: String(value) };
               }
             }
             return null;
           };
-          const getArray = async source => {
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          async function fetchText(url, label, attempts = 2) {
+            let lastError;
+            for (let i = 1; i <= attempts; i++) {
+              try {
+                const response = await fetch(url, {
+                  headers: { 'User-Agent': 'Mozilla/5.0 (compatible; TaiwanMarketDashboard/2.0)', 'Accept': 'application/json,text/html,*/*' },
+                  signal: AbortSignal.timeout(25000)
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.text();
+              } catch (error) {
+                lastError = error;
+                if (i < attempts) await sleep(1500 * i);
+              }
+            }
+            throw new Error(`${label}: ${String(lastError?.message || lastError)}`);
+          }
+          async function fetchArray(source) {
             try {
-              const response = await fetch(source.url, {
-                headers: { 'User-Agent': 'github-actions-tw-market-dashboard/1.0', 'Accept': 'application/json' },
-                signal: AbortSignal.timeout(30000)
-              });
-              if (!response.ok) throw new Error(`HTTP ${response.status}`);
-              const body = await response.json();
+              const text = await fetchText(source.url, source.label);
+              const body = JSON.parse(text);
               if (!Array.isArray(body)) throw new Error('API 回傳不是 JSON 陣列');
-              return { data: body, meta: { label: source.label, status: 'ok', records: body.length, endpoint: source.url, message: '已由 GitHub Actions 伺服器端取得' } };
+              return { data: body, meta: { label: source.label, status: 'ok', records: body.length, endpoint: source.url, message: '由 GitHub Actions 伺服器端取得' } };
             } catch (error) {
               return { data: [], meta: { label: source.label, status: 'error', records: 0, endpoint: source.url, message: String(error.message || error) } };
             }
-          };
+          }
+          function htmlText(html) {
+            return String(html)
+              .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+              .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/&nbsp;|&#160;/gi, ' ')
+              .replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+              .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+              .replace(/\s+/g, ' ').trim();
+          }
+          function htmlRows(html) {
+            return [...String(html).matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map(match =>
+              [...match[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(cell => htmlText(cell[1]))
+            ).filter(cells => cells.length > 0);
+          }
+          function numbersIn(cells) {
+            return cells.map(toNumber).filter(value => value !== null);
+          }
 
-          const results = await Promise.all(SOURCES.map(getArray));
-          const raw = Object.fromEntries(SOURCES.map((s, i) => [s.key, results[i].data]));
-          const sources = Object.fromEntries(SOURCES.map((s, i) => [s.key, results[i].meta]));
-          const indexRow = raw.index.find(row => Object.values(row).some(v => String(v).includes('發行量加權股價指數')));
+          // 1) TWSE aggregated margin financing balance. Values in the row are in thousand NTD.
+          async function getMarginSummary() {
+            const url = 'https://www.twse.com.tw/exchangeReport/MI_MARGN?response=html&selectType=MS';
+            try {
+              const html = await fetchText(url, '上市融資餘額彙總');
+              const rows = htmlRows(html);
+              const amountRow = rows.find(cells => cells.some(cell => /融資金額/.test(cell)));
+              const unitsRow = rows.find(cells => cells.some(cell => /融資\s*\(交易單位\)/.test(cell)));
+              if (!amountRow) throw new Error('報表中找不到「融資金額(仟元)」列');
+              const amounts = numbersIn(amountRow.slice(1));
+              if (amounts.length < 5) throw new Error(`融資金額欄位數不足：${amountRow.join(' | ')}`);
+              const priorThousand = amounts[3];
+              const todayThousand = amounts[4];
+              const pageText = htmlText(html);
+              const dateMatch = pageText.match(/(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*信用交易統計/);
+              const reportDate = dateMatch ? `${Number(dateMatch[1]) + 1911}-${String(Number(dateMatch[2])).padStart(2, '0')}-${String(Number(dateMatch[3])).padStart(2, '0')}` : null;
+              const deltaPct = priorThousand > 0 ? (todayThousand / priorThousand - 1) * 100 : null;
+              return {
+                status: 'ok', label: '上市融資餘額彙總', endpoint: url,
+                date: reportDate, unit: '新臺幣億元',
+                todayBalanceYi: todayThousand / 100000,
+                priorBalanceYi: priorThousand / 100000,
+                deltaYi: (todayThousand - priorThousand) / 100000,
+                deltaPct,
+                quantityRowAvailable: Boolean(unitsRow),
+                message: '融資金額(仟元)彙總列；今日餘額可能於次日調整，前日餘額為較完整確認值。'
+              };
+            } catch (error) {
+              return { status: 'error', label: '上市融資餘額彙總', endpoint: url, message: String(error.message || error) };
+            }
+          }
+
+          // 2) TWSE monthly historical day-trading table. It contains one market-summary row per trading date.
+          async function getDaytradeSummary(tradingDate) {
+            const url = `https://www.twse.com.tw/exchangeReport/TWTB4U2?date=${toCompact(tradingDate)}&response=html&stockNo=`;
+            try {
+              const html = await fetchText(url, '上市當沖市場統計');
+              const rows = htmlRows(html);
+              const matched = rows.find(cells => rocDate(cells[0]) === tradingDate && cells.length >= 7);
+              if (!matched) throw new Error(`報表中找不到交易日 ${tradingDate} 的市場統計列`);
+              const values = matched.slice(1).map(toNumber);
+              if (values.length < 6 || values.slice(0, 6).some(v => v === null)) throw new Error(`當沖欄位格式無法辨識：${matched.join(' | ')}`);
+              return {
+                status: 'ok', label: '上市當沖市場統計', endpoint: url, date: tradingDate,
+                volumeShares: values[0], volumeSharePct: values[1],
+                buyAmount: values[2], buyAmountSharePct: values[3],
+                sellAmount: values[4], sellAmountSharePct: values[5],
+                records: rows.length,
+                message: '採證交所當沖市場統計表；成交股數占比與買賣成交金額占比分開呈現。'
+              };
+            } catch (error) {
+              return { status: 'error', label: '上市當沖市場統計', endpoint: url, date: tradingDate, message: String(error.message || error) };
+            }
+          }
+
+          // 3) TWSE investor account age-distribution table: cumulative account count, published monthly.
+          async function fetchAccountMonth(monthKey) {
+            const [year, month] = monthKey.split('-').map(Number);
+            const url = `https://www.twse.com.tw/zh/trading/statistics/list02-264.html?date=${year}${String(month).padStart(2, '0')}01`;
+            try {
+              const html = await fetchText(url, `投資人開戶統計 ${monthKey}`);
+              const text = htmlText(html);
+              const rocMonth = text.match(/(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*投資人開戶數年齡分布統計表/);
+              const returnedMonth = rocMonth ? `${Number(rocMonth[1]) + 1911}-${String(Number(rocMonth[2])).padStart(2, '0')}` : null;
+              if (returnedMonth && returnedMonth !== monthKey) throw new Error(`查詢 ${monthKey}，但頁面回傳 ${returnedMonth}`);
+              const rows = htmlRows(html);
+              const totalRow = rows.find(cells => cells.some(cell => /合計/.test(cell)) && numbersIn(cells).length >= 8);
+              if (!totalRow) throw new Error('找不到「開戶人數－合計」資料列，可能是頁面結構已變更');
+              const nums = numbersIn(totalRow);
+              const total = nums.at(-1);
+              const age20to30 = nums.length >= 8 ? nums[1] : null;
+              if (!(total > 0)) throw new Error('開戶總數為空或無效');
+              return {
+                status: 'ok', month: returnedMonth || monthKey, totalAccounts: total,
+                age20to30Accounts: age20to30,
+                age20to30SharePct: age20to30 !== null ? age20to30 / total * 100 : null,
+                endpoint: url, message: 'TWSE 每月投資人開戶數年齡分布統計；總數是累計帳戶數，不是當月新開戶毛額。'
+              };
+            } catch (error) {
+              return { status: 'error', month: monthKey, endpoint: url, message: String(error.message || error) };
+            }
+          }
+          async function getLatestAccounts(existingHistory = []) {
+            const reportsByMonth = new Map((Array.isArray(existingHistory) ? existingHistory : []).map(item => [item.month, { ...item, status: 'ok' }]));
+            const bootstrap = reportsByMonth.size < 12;
+            const maxOffset = bootstrap ? 18 : 5;
+            let newestReport = null;
+            for (let offset = 0; offset <= maxOffset; offset++) {
+              const m = monthShift(yyyy, mm, -offset);
+              const report = await fetchAccountMonth(m.key);
+              if (report.status === 'ok') {
+                reportsByMonth.set(report.month, report);
+                if (!newestReport || report.month > newestReport.month) newestReport = report;
+                if (!bootstrap && reportsByMonth.has(report.month) && report.month <= (existingHistory.at(-1)?.month || '0000-00')) break;
+                if (bootstrap && reportsByMonth.size >= 13) break;
+              }
+              // Avoid sending a burst of requests to the official monthly statistics page.
+              await sleep(450);
+            }
+            const allReports = [...reportsByMonth.values()].sort((a, b) => String(a.month).localeCompare(String(b.month)));
+            const calculated = allReports.map((report, i) => {
+              const [year, month] = report.month.split('-').map(Number);
+              const previousMonth = monthShift(year, month, -1).key;
+              const previous = allReports.find(item => item.month === previousMonth);
+              return {
+                month: report.month,
+                totalAccounts: report.totalAccounts,
+                age20to30Accounts: report.age20to30Accounts ?? null,
+                age20to30SharePct: report.age20to30SharePct ?? null,
+                netChangeAccounts: previous ? report.totalAccounts - previous.totalAccounts : null,
+                netChangePct: previous && previous.totalAccounts > 0 ? (report.totalAccounts / previous.totalAccounts - 1) * 100 : null
+              };
+            }).slice(-60);
+            const latest = calculated.at(-1);
+            if (!latest) return { status: 'error', label: '投資人開戶統計', message: '最近六個月及歷史回補均未成功解析 TWSE 月報。' };
+            const previous = calculated.find(item => item.month === monthShift(...latest.month.split('-').map(Number), -1).key);
+            const latestReport = {
+              status: 'ok', label: '投資人開戶統計', month: latest.month,
+              totalAccounts: latest.totalAccounts,
+              age20to30Accounts: latest.age20to30Accounts,
+              age20to30SharePct: latest.age20to30SharePct,
+              previousMonth: previous?.month ?? null,
+              previousTotalAccounts: previous?.totalAccounts ?? null,
+              netChangeAccounts: latest.netChangeAccounts,
+              netChangePct: latest.netChangePct,
+              netChange20to30: previous && latest.age20to30Accounts != null && previous.age20to30Accounts != null ? latest.age20to30Accounts - previous.age20to30Accounts : null,
+              endpoint: `https://www.twse.com.tw/zh/trading/statistics/list02-264.html?date=${latest.month.replace('-', '')}01`,
+              message: '每月累計開戶帳戶數；月淨增減是相鄰月份累計值差額，不等於當月新開戶毛額或獨立投資人數。'
+            };
+            fs.writeFileSync('data/accounts-history.json', JSON.stringify(calculated, null, 2) + '\n');
+            return { ...latestReport, history: calculated };
+          }
+
+          const fetched = await Promise.all(SOURCES.map(fetchArray));
+          const raw = Object.fromEntries(SOURCES.map((source, i) => [source.key, fetched[i].data]));
+          const sources = Object.fromEntries(SOURCES.map((source, i) => [source.key, fetched[i].meta]));
+          const oldAccounts = (() => { try { return JSON.parse(fs.readFileSync('data/accounts-history.json', 'utf8')); } catch { return []; } })();
+          const accountHistory = Array.isArray(oldAccounts) ? oldAccounts : [];
+
+          const indexRow = raw.index.find(row => Object.values(row).some(value => String(value).includes('發行量加權股價指數')));
           let index = null;
           if (indexRow) {
             const close = pick(indexRow, [/收盤指數/]);
-            const pointsAbs = pick(indexRow, [/漲跌點數/]);
+            const points = pick(indexRow, [/漲跌點數/]);
             const pct = pick(indexRow, [/漲跌百分比/]);
             const sign = String(indexRow['漲跌'] || '').trim();
             const dateRaw = String(indexRow['日期'] || '');
             let date = dateRaw;
-            if (/^\d{7}$/.test(dateRaw)) date = `${Number(dateRaw.slice(0,3)) + 1911}-${dateRaw.slice(3,5)}-${dateRaw.slice(5,7)}`;
+            if (/^\d{7}$/.test(dateRaw)) date = `${Number(dateRaw.slice(0, 3)) + 1911}-${dateRaw.slice(3, 5)}-${dateRaw.slice(5, 7)}`;
+            else date = rocDate(dateRaw) || dateRaw;
             index = {
-              date,
-              close: close?.value ?? null,
-              changePoints: pointsAbs ? (sign === '-' ? -Math.abs(pointsAbs.value) : sign === '+' ? Math.abs(pointsAbs.value) : pointsAbs.value) : null,
+              date, close: close?.value ?? null,
+              changePoints: points ? (sign === '-' ? -Math.abs(points.value) : sign === '+' ? Math.abs(points.value) : points.value) : null,
               changePct: pct?.value ?? null
             };
           }
+          if (!index?.date || !index?.close) {
+            console.error('無法辨識加權指數。來源狀態：', sources.index);
+            throw new Error('主要資料源 MI_INDEX 未取得有效加權指數，停止覆寫資料。');
+          }
+          const tradingDate = index.date;
 
           function classifyRows(rows, market) {
             let advance = 0, decline = 0, unchanged = 0, examined = 0;
@@ -117,73 +307,128 @@ jobs:
           }
           const listedBreadth = classifyRows(raw.stocks, '上市');
           const otcBreadth = classifyRows(raw.tpex, '上櫃');
-          const breadthTotal = {
+          const breadth = {
             advance: listedBreadth.advance + otcBreadth.advance,
             decline: listedBreadth.decline + otcBreadth.decline,
             unchanged: listedBreadth.unchanged + otcBreadth.unchanged,
             total: listedBreadth.examined + otcBreadth.examined,
             coverage: listedBreadth.examined && otcBreadth.examined ? '上市＋上櫃' : listedBreadth.examined ? '僅上市' : otcBreadth.examined ? '僅上櫃' : null,
-            listed: listedBreadth,
-            otc: otcBreadth
+            listed: listedBreadth, otc: otcBreadth
           };
 
-          const marginRows = raw.margin;
-          const margin = { records: marginRows.length };
-          const daytradeRows = raw.daytrade;
-          let marketPct = null;
-          const summaryRow = daytradeRows.find(row => Object.keys(row).some(k => /占市場比重/.test(k)));
-          if (summaryRow) {
-            const ratio = pick(summaryRow, [/當日沖銷.*占市場比重/, /當沖.*占市場比重/]);
-            if (ratio) marketPct = ratio.value;
-          }
-          const daytrade = { records: daytradeRows.length, marketPct };
+          const [margin, daytrade, accounts] = await Promise.all([
+            getMarginSummary(), getDaytradeSummary(tradingDate), getLatestAccounts(accountHistory)
+          ]);
+          sources.marginSummary = { label: margin.label || '上市融資餘額彙總', status: margin.status === 'ok' && margin.date !== tradingDate ? 'stale' : margin.status, records: margin.status === 'ok' ? 1 : 0, endpoint: margin.endpoint || '', message: margin.status === 'ok' && margin.date !== tradingDate ? `來源日期 ${margin.date || '未知'} 與指數交易日 ${tradingDate} 不一致` : margin.message };
+          sources.daytradeSummary = { label: daytrade.label || '上市當沖市場統計', status: daytrade.status === 'ok' && daytrade.date !== tradingDate ? 'stale' : daytrade.status, records: daytrade.status === 'ok' ? 1 : 0, endpoint: daytrade.endpoint || '', message: daytrade.status === 'ok' && daytrade.date !== tradingDate ? `來源日期 ${daytrade.date || '未知'} 與指數交易日 ${tradingDate} 不一致` : daytrade.message };
+          sources.accounts = { label: accounts.label || '投資人開戶統計', status: accounts.status, records: accounts.status === 'ok' ? 1 : 0, endpoint: accounts.endpoint || '', message: accounts.message || accounts.previousMonthStatus || '' };
 
-          const previousHistory = (() => {
-            try { return JSON.parse(fs.readFileSync('data/history.json', 'utf8')); }
-            catch { return []; }
-          })();
-          const tradingDate = index?.date || new Date().toISOString().slice(0,10);
+          const oldHistory = (() => { try { return JSON.parse(fs.readFileSync('data/history.json', 'utf8')); } catch { return []; } })();
+          const history = Array.isArray(oldHistory) ? oldHistory : [];
+          const updatedAccountHistory = Array.isArray(accounts.history) ? accounts.history : accountHistory;
           const snapshot = {
             date: tradingDate,
-            close: index?.close ?? null,
-            changePct: index?.changePct ?? null,
-            advance: breadthTotal.advance,
-            decline: breadthTotal.decline,
-            unchanged: breadthTotal.unchanged
+            close: index.close,
+            changePct: index.changePct,
+            advance: breadth.advance,
+            decline: breadth.decline,
+            unchanged: breadth.unchanged,
+            marginBalanceYi: margin.status === 'ok' && margin.date === tradingDate ? margin.todayBalanceYi : null,
+            marginChangePct: margin.status === 'ok' && margin.date === tradingDate ? margin.deltaPct : null,
+            daytradeSharePct: daytrade.status === 'ok' && daytrade.date === tradingDate ? daytrade.volumeSharePct : null,
+            accountMonth: accounts.status === 'ok' ? accounts.month : null
           };
-          const history = previousHistory.filter(item => item.date !== tradingDate);
-          history.push(snapshot);
-          history.sort((a,b) => String(a.date).localeCompare(String(b.date)));
-          const trimmedHistory = history.slice(-500);
+          const nextHistory = history.filter(item => item.date !== tradingDate);
+          nextHistory.push(snapshot);
+          nextHistory.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+          const trimmedHistory = nextHistory.slice(-500);
+
+          const percentile = (values, current, minSamples = 60) => {
+            const valid = values.filter(Number.isFinite);
+            if (!Number.isFinite(current) || valid.length < minSamples) return null;
+            const lessOrEqual = valid.filter(value => value <= current).length;
+            return lessOrEqual / valid.length * 100;
+          };
+          const margin20dSeries = [];
+          for (let i = 20; i < trimmedHistory.length; i++) {
+            const start = trimmedHistory[i - 20].marginBalanceYi;
+            const end = trimmedHistory[i].marginBalanceYi;
+            margin20dSeries.push(start > 0 && end > 0 ? (end / start - 1) * 100 : null);
+          }
+          const currentMargin20d = margin20dSeries.at(-1);
+          const previousMargin20d = margin20dSeries.slice(0, -1).slice(-250);
+          const previousDaytrade = trimmedHistory.slice(0, -1).slice(-250).map(item => item.daytradeSharePct);
+          const accountRecordsForScore = updatedAccountHistory.filter(item => item.month !== accounts.month);
+          const heatComponents = [];
+          const marginPctl = percentile(previousMargin20d, currentMargin20d, 40);
+          if (marginPctl !== null) heatComponents.push({ key: 'margin20d', label: '融資餘額 20 日變化', value: currentMargin20d, unit: '%', percentile: marginPctl, samples: previousMargin20d.filter(Number.isFinite).length, weight: 0.4 });
+          const daytradePctl = percentile(previousDaytrade, snapshot.daytradeSharePct, 60);
+          if (daytradePctl !== null) heatComponents.push({ key: 'daytrade', label: '當沖成交股數占比', value: snapshot.daytradeSharePct, unit: '%', percentile: daytradePctl, samples: previousDaytrade.filter(Number.isFinite).length, weight: 0.4 });
+          const accountPctl = percentile(accountRecordsForScore.slice(-60).map(item => item.netChangePct), accounts.netChangePct, 12);
+          if (accountPctl !== null) heatComponents.push({ key: 'accounts', label: '開戶總數月淨增率', value: accounts.netChangePct, unit: '%', percentile: accountPctl, samples: accountRecordsForScore.length, weight: 0.2 });
+          const heatWeight = heatComponents.reduce((sum, item) => sum + item.weight, 0);
+          const heatIndex = heatComponents.length >= 2 ? heatComponents.reduce((sum, item) => sum + item.percentile * item.weight, 0) / heatWeight : null;
+
+          const priorHistory = trimmedHistory.slice(0, -1).slice(-250);
+          const currentDeclineRatio = breadth.advance + breadth.decline > 0 ? breadth.decline / (breadth.advance + breadth.decline) * 100 : null;
+          const priorDeclineRatios = priorHistory.map(item => item.advance + item.decline > 0 ? item.decline / (item.advance + item.decline) * 100 : null);
+          const currentDownMove = Number.isFinite(index.changePct) ? Math.max(0, -index.changePct) : null;
+          const priorDownMoves = priorHistory.map(item => Number.isFinite(item.changePct) ? Math.max(0, -item.changePct) : null);
+          const breadthFearPctl = percentile(priorDeclineRatios, currentDeclineRatio, 60);
+          const priceFearPctl = percentile(priorDownMoves, currentDownMove, 60);
+          const fearIndex = breadthFearPctl !== null && priceFearPctl !== null ? (breadthFearPctl + priceFearPctl) / 2 : null;
+
+          const sentiment = {
+            heatIndex: heatIndex === null ? null : Math.round(heatIndex),
+            fearIndex: fearIndex === null ? null : Math.round(fearIndex),
+            heatStatus: heatIndex === null ? '樣本不足' : heatIndex >= 90 ? '極端過熱' : heatIndex >= 80 ? '偏熱' : heatIndex <= 20 ? '冷淡' : '中性區間',
+            fearStatus: fearIndex === null ? '樣本不足' : fearIndex >= 90 ? '極端恐慌' : fearIndex >= 80 ? '恐慌偏高' : '未達恐慌門檻',
+            heatComponents,
+            fearComponents: [
+              { key: 'breadth', label: '下跌家數占比', value: currentDeclineRatio, percentile: breadthFearPctl, samples: priorDeclineRatios.filter(Number.isFinite).length },
+              { key: 'downMove', label: '指數單日跌幅', value: currentDownMove, percentile: priceFearPctl, samples: priorDownMoves.filter(Number.isFinite).length }
+            ],
+            dailySamples: trimmedHistory.length,
+            accountMonths: updatedAccountHistory.length,
+            methodology: '群眾熱度：融資餘額20日變化、上市當沖成交股數占比、月開戶總數淨增率的歷史百分位加權；恐慌程度：下跌家數占比與指數單日跌幅的歷史百分位平均。每日序列至少60筆、月開戶序列至少12期才納入。'
+          };
+
+          snapshot.heatIndex = sentiment.heatIndex;
+          snapshot.fearIndex = sentiment.fearIndex;
+          trimmedHistory[trimmedHistory.length - 1] = snapshot;
 
           const payload = {
             generatedAt: new Date().toISOString(),
             tradingDate,
             sources,
-            normalized: { index, breadth: breadthTotal, margin, daytrade },
+            normalized: {
+              index, breadth,
+              margin: margin.status === 'ok' && margin.date === tradingDate ? margin : { ...margin, stale: margin.status === 'ok' && margin.date !== tradingDate },
+              daytrade: daytrade.status === 'ok' && daytrade.date === tradingDate ? daytrade : { ...daytrade, stale: daytrade.status === 'ok' && daytrade.date !== tradingDate },
+              accounts,
+              sentiment
+            },
             historyCount: trimmedHistory.length,
+            accountHistoryCount: updatedAccountHistory.length,
             history: trimmedHistory
           };
-
-          if (!index) {
-            console.error('無法辨識加權指數資料。來源回應：', sources.index);
-            throw new Error('主要資料源 MI_INDEX 未取得有效加權指數，停止覆寫有效資料。');
-          }
           fs.writeFileSync('data/latest.json', JSON.stringify(payload, null, 2) + '\n');
           fs.writeFileSync('data/history.json', JSON.stringify(trimmedHistory, null, 2) + '\n');
-          console.log(`資料快照完成：交易日 ${tradingDate}；加權指數 ${index.close}；市場廣度樣本 ${breadthTotal.total}；歷史 ${trimmedHistory.length} 日`);
+
+          console.log(`交易日 ${tradingDate}；指數 ${index.close}；融資餘額 ${margin.todayBalanceYi ?? 'N/A'} 億；當沖比 ${daytrade.volumeSharePct ?? 'N/A'}%；開戶月 ${accounts.month ?? 'N/A'}；熱度 ${sentiment.heatIndex ?? 'N/A'}；恐慌 ${sentiment.fearIndex ?? 'N/A'}`);
           for (const [key, meta] of Object.entries(sources)) console.log(`${key}: ${meta.status}, ${meta.records} rows, ${meta.message}`);
+          console.log(`歷史交易日 ${trimmedHistory.length}；開戶月資料 ${updatedAccountHistory.length}；熱度指標 components ${heatComponents.length}`);
           NODE
 
       - name: Commit updated data files
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/latest.json data/history.json
+          git add data/
           if git diff --cached --quiet; then
             echo "No market data changes to commit."
           else
-            git commit -m "Update Taiwan market data"
+            git commit -m "Update Taiwan market sentiment data"
             git push
           fi
 
@@ -193,14 +438,14 @@ jobs:
           cp index.html site/index.html
           cp data/latest.json site/data/latest.json
           cp data/history.json site/data/history.json
+          if [ -f data/accounts-history.json ]; then cp data/accounts-history.json site/data/accounts-history.json; fi
           touch site/.nojekyll
 
       - name: Upload website artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./site
 
       - name: Deploy website to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
-
+        uses: actions/deploy-pages@v5
