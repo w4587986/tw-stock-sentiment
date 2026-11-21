@@ -1,0 +1,206 @@
+name: Update Taiwan market data
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - '.github/workflows/update-market-data.yml'
+  workflow_dispatch:
+  schedule:
+    # 09:30 UTC = 17:30 Asia/Taipei, Monday-Friday.
+    - cron: '30 9 * * 1-5'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch public market data and create JSON snapshot
+        run: |
+          mkdir -p data
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const BASE = 'https://openapi.twse.com.tw/v1';
+          const SOURCES = [
+            { key: 'index', label: '加權指數', url: `${BASE}/exchangeReport/MI_INDEX` },
+            { key: 'stocks', label: '上市股票日成交資訊', url: `${BASE}/exchangeReport/STOCK_DAY_ALL` },
+            { key: 'margin', label: '上市融資融券明細', url: `${BASE}/exchangeReport/MI_MARGN` },
+            { key: 'daytrade', label: '上市當沖統計', url: `${BASE}/exchangeReport/TWTB4U` },
+            { key: 'tpex', label: '上櫃股票收盤行情', url: 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes' }
+          ];
+
+          const num = value => {
+            if (value === null || value === undefined) return null;
+            const s = String(value).replace(/,/g, '').replace(/％|%/g, '').trim();
+            if (!s || s === '--' || s === '-' || s === 'X') return null;
+            const n = Number(s);
+            return Number.isFinite(n) ? n : null;
+          };
+          const pick = (row, patterns) => {
+            if (!row) return null;
+            for (const [key, value] of Object.entries(row)) {
+              if (patterns.some(p => p.test(key))) {
+                const n = num(value);
+                if (n !== null) return { key, value: n, raw: String(value) };
+              }
+            }
+            return null;
+          };
+          const getArray = async source => {
+            try {
+              const response = await fetch(source.url, {
+                headers: { 'User-Agent': 'github-actions-tw-market-dashboard/1.0', 'Accept': 'application/json' },
+                signal: AbortSignal.timeout(30000)
+              });
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              const body = await response.json();
+              if (!Array.isArray(body)) throw new Error('API 回傳不是 JSON 陣列');
+              return { data: body, meta: { label: source.label, status: 'ok', records: body.length, endpoint: source.url, message: '已由 GitHub Actions 伺服器端取得' } };
+            } catch (error) {
+              return { data: [], meta: { label: source.label, status: 'error', records: 0, endpoint: source.url, message: String(error.message || error) } };
+            }
+          };
+
+          const results = await Promise.all(SOURCES.map(getArray));
+          const raw = Object.fromEntries(SOURCES.map((s, i) => [s.key, results[i].data]));
+          const sources = Object.fromEntries(SOURCES.map((s, i) => [s.key, results[i].meta]));
+          const indexRow = raw.index.find(row => Object.values(row).some(v => String(v).includes('發行量加權股價指數')));
+          let index = null;
+          if (indexRow) {
+            const close = pick(indexRow, [/收盤指數/]);
+            const pointsAbs = pick(indexRow, [/漲跌點數/]);
+            const pct = pick(indexRow, [/漲跌百分比/]);
+            const sign = String(indexRow['漲跌'] || '').trim();
+            const dateRaw = String(indexRow['日期'] || '');
+            let date = dateRaw;
+            if (/^\d{7}$/.test(dateRaw)) date = `${Number(dateRaw.slice(0,3)) + 1911}-${dateRaw.slice(3,5)}-${dateRaw.slice(5,7)}`;
+            index = {
+              date,
+              close: close?.value ?? null,
+              changePoints: pointsAbs ? (sign === '-' ? -Math.abs(pointsAbs.value) : sign === '+' ? Math.abs(pointsAbs.value) : pointsAbs.value) : null,
+              changePct: pct?.value ?? null
+            };
+          }
+
+          function classifyRows(rows, market) {
+            let advance = 0, decline = 0, unchanged = 0, examined = 0;
+            for (const row of rows) {
+              const change = pick(row, [/^Change$/i, /漲跌價差/, /漲跌幅/, /^漲跌$/]);
+              if (!change) continue;
+              examined++;
+              if (change.value > 0) advance++;
+              else if (change.value < 0) decline++;
+              else unchanged++;
+            }
+            return { market, advance, decline, unchanged, examined };
+          }
+          const listedBreadth = classifyRows(raw.stocks, '上市');
+          const otcBreadth = classifyRows(raw.tpex, '上櫃');
+          const breadthTotal = {
+            advance: listedBreadth.advance + otcBreadth.advance,
+            decline: listedBreadth.decline + otcBreadth.decline,
+            unchanged: listedBreadth.unchanged + otcBreadth.unchanged,
+            total: listedBreadth.examined + otcBreadth.examined,
+            coverage: listedBreadth.examined && otcBreadth.examined ? '上市＋上櫃' : listedBreadth.examined ? '僅上市' : otcBreadth.examined ? '僅上櫃' : null,
+            listed: listedBreadth,
+            otc: otcBreadth
+          };
+
+          const marginRows = raw.margin;
+          const margin = { records: marginRows.length };
+          const daytradeRows = raw.daytrade;
+          let marketPct = null;
+          const summaryRow = daytradeRows.find(row => Object.keys(row).some(k => /占市場比重/.test(k)));
+          if (summaryRow) {
+            const ratio = pick(summaryRow, [/當日沖銷.*占市場比重/, /當沖.*占市場比重/]);
+            if (ratio) marketPct = ratio.value;
+          }
+          const daytrade = { records: daytradeRows.length, marketPct };
+
+          const previousHistory = (() => {
+            try { return JSON.parse(fs.readFileSync('data/history.json', 'utf8')); }
+            catch { return []; }
+          })();
+          const tradingDate = index?.date || new Date().toISOString().slice(0,10);
+          const snapshot = {
+            date: tradingDate,
+            close: index?.close ?? null,
+            changePct: index?.changePct ?? null,
+            advance: breadthTotal.advance,
+            decline: breadthTotal.decline,
+            unchanged: breadthTotal.unchanged
+          };
+          const history = previousHistory.filter(item => item.date !== tradingDate);
+          history.push(snapshot);
+          history.sort((a,b) => String(a.date).localeCompare(String(b.date)));
+          const trimmedHistory = history.slice(-500);
+
+          const payload = {
+            generatedAt: new Date().toISOString(),
+            tradingDate,
+            sources,
+            normalized: { index, breadth: breadthTotal, margin, daytrade },
+            historyCount: trimmedHistory.length,
+            history: trimmedHistory
+          };
+
+          if (!index) {
+            console.error('無法辨識加權指數資料。來源回應：', sources.index);
+            throw new Error('主要資料源 MI_INDEX 未取得有效加權指數，停止覆寫有效資料。');
+          }
+          fs.writeFileSync('data/latest.json', JSON.stringify(payload, null, 2) + '\n');
+          fs.writeFileSync('data/history.json', JSON.stringify(trimmedHistory, null, 2) + '\n');
+          console.log(`資料快照完成：交易日 ${tradingDate}；加權指數 ${index.close}；市場廣度樣本 ${breadthTotal.total}；歷史 ${trimmedHistory.length} 日`);
+          for (const [key, meta] of Object.entries(sources)) console.log(`${key}: ${meta.status}, ${meta.records} rows, ${meta.message}`);
+          NODE
+
+      - name: Commit updated data files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/latest.json data/history.json
+          if git diff --cached --quiet; then
+            echo "No market data changes to commit."
+          else
+            git commit -m "Update Taiwan market data"
+            git push
+          fi
+
+      - name: Prepare GitHub Pages website files
+        run: |
+          mkdir -p site/data
+          cp index.html site/index.html
+          cp data/latest.json site/data/latest.json
+          cp data/history.json site/data/history.json
+          touch site/.nojekyll
+
+      - name: Upload website artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+      - name: Deploy website to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
