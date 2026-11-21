@@ -343,7 +343,7 @@ const filtered = history.filter(item => item.date !== latestDate);
 filtered.push(current);
 history = filtered.sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
-const targetCompleteDays = 90;
+const targetCompleteDays = 120;
 let completeCount = history.filter(isComplete).length;
 let fetchedDates = 0;
 let missingIndexDays = 0;
