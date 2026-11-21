@@ -141,32 +141,98 @@ async function fetchTwseIndex(date) {
   return parseTwseIndex(body, date);
 }
 async function fetchTwseMargin(date) {
-  // TWSE historical market-wide credit statistics: selectType=MS (信用交易統計).
-  // This endpoint returns creditList, not the per-stock tables returned by marginTrading/MI_MARGN.
-  const url = 'https://www.twse.com.tw/exchangeReport/MI_MARGN?date=' + compact(date) + '&selectType=MS&response=json';
-  const body = await fetchJson(url, 'TWSE MI_MARGN ' + date);
-  const returnedDate = rocDate(body.creditTitle || '');
-  if (returnedDate && returnedDate !== date) {
-    throw new Error('報表日期 ' + returnedDate + ' 與查詢日期 ' + date + ' 不一致');
-  }
-  const rows = Array.isArray(body.creditList) ? body.creditList : [];
-  const row = rows.find(item => String(item?.[0] || '').includes('融資金額'));
-  if (!row) throw new Error('回傳未包含融資金額統計列；stat=' + String(body.stat || 'unknown'));
-  // creditList row columns: label, buy, sell, cash redemption, prior balance, current balance.
-  const amounts = row.slice(1).map(number);
-  if (amounts.length < 5 || amounts.slice(0, 5).some(value => value === null)) {
-    throw new Error('融資金額統計列欄位不足：' + JSON.stringify(row));
-  }
-  const priorThousand = amounts[3];
-  const todayThousand = amounts[4];
-  if (!(priorThousand > 0) || !(todayThousand > 0)) throw new Error('融資餘額數值無效');
-  return {
-    date,
-    todayBalanceYi: todayThousand / 100000,
-    priorBalanceYi: priorThousand / 100000,
-    deltaYi: (todayThousand - priorThousand) / 100000,
-    deltaPct: (todayThousand / priorThousand - 1) * 100
+  // TWSE's current RWD endpoint returns tables; the legacy JSON endpoint uses creditList.
+  // Use selectType=ALL: the official credit amount row is included with the daily summary.
+  const ymd = compact(date);
+  const endpoints = [
+    {
+      label: 'TWSE MI_MARGN RWD',
+      url: 'https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date=' + ymd + '&selectType=ALL&response=json'
+    },
+    {
+      label: 'TWSE MI_MARGN legacy',
+      url: 'https://www.twse.com.tw/exchangeReport/MI_MARGN?response=json&dayDate=' + ymd + '&selectType=ALL'
+    }
+  ];
+  const reportDateFromText = value => {
+    const s = String(value || '').trim();
+    let m = s.match(/(20\d{2})\s*[\/.-]\s*(\d{1,2})\s*[\/.-]\s*(\d{1,2})/);
+    if (m) return m[1] + '-' + String(Number(m[2])).padStart(2, '0') + '-' + String(Number(m[3])).padStart(2, '0');
+    m = s.match(/(20\d{2})(\d{2})(\d{2})/);
+    if (m) return m[1] + '-' + m[2] + '-' + m[3];
+    return rocDate(s);
   };
+  const errors = [];
+  for (const endpoint of endpoints) {
+    try {
+      const body = await fetchJson(endpoint.url, endpoint.label + ' ' + date);
+      const tables = Array.isArray(body.tables) ? body.tables : [];
+      const titleCandidates = [
+        body.creditTitle, body.title, body.date, body.reportDate,
+        ...tables.map(table => table.title || table.subtitle || '')
+      ];
+      const returnedDate = titleCandidates.map(reportDateFromText).find(Boolean) || null;
+      if (returnedDate && returnedDate !== date) {
+        throw new Error('報表日期 ' + returnedDate + ' 與查詢日期 ' + date + ' 不一致');
+      }
+
+      const rows = [];
+      if (Array.isArray(body.creditList)) rows.push(...body.creditList);
+      for (const table of tables) {
+        if (Array.isArray(table.data)) rows.push(...table.data);
+      }
+      if (Array.isArray(body.data)) rows.push(...body.data);
+
+      const row = rows.find(item => {
+        const label = Array.isArray(item)
+          ? item[0]
+          : item?.['項目'] ?? item?.['項目名稱'] ?? item?.['item'] ?? '';
+        return String(label || '').normalize('NFKC').replace(/\s/g, '').includes('融資金額');
+      });
+      if (!row) {
+        throw new Error(
+          '找不到「融資金額(仟元)」列；creditList=' +
+          (Array.isArray(body.creditList) ? body.creditList.length : '無') +
+          '，tables=' + tables.length + '，stat=' + String(body.stat || 'unknown')
+        );
+      }
+
+      // Official row order: label, buy, sell, cash redemption, prior balance, current balance.
+      // Support both flat creditList rows and nested table cells.
+      const rawValues = Array.isArray(row)
+        ? row.slice(1).flat(3)
+        : [row['買進'], row['賣出'], row['現金(券)償還'], row['前日餘額'], row['今日餘額']];
+      const amounts = rawValues.map(number);
+      if (amounts.length < 5 || amounts.slice(0, 5).some(value => value === null)) {
+        throw new Error('融資金額統計列欄位不足：' + JSON.stringify(row));
+      }
+
+      const [buyThousand, sellThousand, redemptionThousand, priorThousand, todayThousand] = amounts;
+      if (!(priorThousand > 0) || !(todayThousand > 0)) throw new Error('融資餘額數值無效');
+
+      // Sanity check the amount row's own balance equation; avoid accepting a shifted column layout.
+      if ([buyThousand, sellThousand, redemptionThousand].every(Number.isFinite)) {
+        const expectedToday = priorThousand + buyThousand - sellThousand - redemptionThousand;
+        const discrepancy = Math.abs(expectedToday - todayThousand);
+        if (discrepancy > Math.max(10, Math.abs(todayThousand) * 0.005)) {
+          throw new Error('融資金額列未通過餘額恆等式檢查，差額=' + discrepancy + ' 仟元');
+        }
+      }
+
+      return {
+        date,
+        todayBalanceYi: todayThousand / 100000,
+        priorBalanceYi: priorThousand / 100000,
+        deltaYi: (todayThousand - priorThousand) / 100000,
+        deltaPct: (todayThousand / priorThousand - 1) * 100,
+        source: endpoint.label,
+        dateVerified: returnedDate === date
+      };
+    } catch (error) {
+      errors.push(endpoint.label + ': ' + String(error.message || error));
+    }
+  }
+  throw new Error(errors.join('；'));
 }
 async function fetchTpexBreadth(date) {
   const [year, month, day] = dateParts(date);
@@ -245,6 +311,7 @@ function isComplete(item) {
     Number.isFinite(item.advance) &&
     Number.isFinite(item.decline) &&
     Number.isFinite(item.marginBalanceYi) &&
+    item.marginBalanceFinalized === true &&
     Number.isFinite(item.daytradeSharePct) &&
     item.breadthCoverage === '上市＋上櫃';
 }
@@ -269,7 +336,7 @@ function calculateScores(history, accountHistory) {
   const downMoveHistory = [];
   for (let i = 0; i < history.length; i++) {
     const row = history[i];
-    if (Number.isFinite(row.marginBalanceYi)) marginHistory.push(row.marginBalanceYi);
+    if (Number.isFinite(row.marginBalanceYi) && row.marginBalanceFinalized === true) marginHistory.push(row.marginBalanceYi);
     let currentMargin20d = null;
     const margin20Series = [];
     for (let j = 20; j < marginHistory.length; j++) {
@@ -340,10 +407,13 @@ current.advance = latestBreadth.advance ?? current.advance;
 current.decline = latestBreadth.decline ?? current.decline;
 current.unchanged = latestBreadth.unchanged ?? current.unchanged;
 current.breadthCoverage = latestBreadth.coverage || current.breadthCoverage || null;
-current.marginBalanceYi = latest.normalized.margin?.status === 'ok' && !latest.normalized.margin?.stale
-  ? latest.normalized.margin.todayBalanceYi : current.marginBalanceYi;
-current.marginChangePct = latest.normalized.margin?.status === 'ok' && !latest.normalized.margin?.stale
-  ? latest.normalized.margin.deltaPct : current.marginChangePct;
+if (latest.normalized.margin?.status === 'ok' && !latest.normalized.margin?.stale) {
+  current.marginBalanceYi = latest.normalized.margin.todayBalanceYi;
+  current.marginPriorBalanceYi = latest.normalized.margin.priorBalanceYi ?? null;
+  current.marginChangePct = latest.normalized.margin.deltaPct;
+  // TWSE notes that today's amount is preliminary; the next trading day's prior balance is the confirmed value.
+  current.marginBalanceFinalized = false;
+}
 current.daytradeSharePct = latest.normalized.daytrade?.status === 'ok' && !latest.normalized.daytrade?.stale
   ? latest.normalized.daytrade.volumeSharePct : current.daytradeSharePct;
 current.accountMonth = latest.normalized.accounts?.month || current.accountMonth;
@@ -352,21 +422,47 @@ filtered.push(current);
 history = filtered.sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
 const targetCompleteDays = 120;
-let completeCount = history.filter(isComplete).length;
+let completeCount = 0;
 let fetchedDates = 0;
 let missingIndexDays = 0;
 let missingTpexDays = 0;
 let missingMarginDays = 0;
 let missingDaytradeDays = 0;
 
-console.log('歷史回補起始：現有 ' + history.length + ' 個日期；完整樣本 ' + completeCount + '/' + targetCompleteDays + '。');
+console.log('歷史回補起始：現有 ' + history.length + ' 個日期；完整樣本 ' + history.filter(isComplete).length + '/' + targetCompleteDays + '。');
 const candidates = buildDateCandidates(latestDate, 260);
 const byDate = new Map(history.map(item => [item.date, item]));
+// D+1 correction: the latest report's prior balance confirms the preceding trading session.
+let pendingMarginCorrection = latest.normalized.margin?.status === 'ok' &&
+  !latest.normalized.margin?.stale &&
+  latest.normalized.margin?.date === latestDate &&
+  Number.isFinite(latest.normalized.margin?.priorBalanceYi)
+    ? latest.normalized.margin.priorBalanceYi : null;
 
 for (const date of candidates) {
+  completeCount = [...byDate.values()].filter(isComplete).length;
   if (completeCount >= targetCompleteDays) break;
-  const prior = byDate.get(date);
-  if (prior && isComplete(prior)) continue;
+
+  let prior = byDate.get(date);
+
+  // This date is already a validated trading day if an index row exists.
+  // Apply the more reliable next-day prior balance before deciding whether it needs another fetch.
+  if (prior && Number.isFinite(prior.close) && pendingMarginCorrection !== null) {
+    prior = {
+      ...prior,
+      marginBalanceYi: pendingMarginCorrection,
+      marginBalanceFinalized: true,
+      marginBalanceSource: 'next-trading-day-prior-balance'
+    };
+    byDate.set(date, prior);
+    pendingMarginCorrection = null;
+  }
+
+  // If this row is already complete and its own prior balance was stored, propagate that correction backwards.
+  if (prior && isComplete(prior) && Number.isFinite(prior.marginPriorBalanceYi)) {
+    pendingMarginCorrection = prior.marginPriorBalanceYi;
+    continue;
+  }
 
   let twse;
   try {
@@ -378,6 +474,18 @@ for (const date of candidates) {
   if (!twse) {
     missingIndexDays++;
     continue;
+  }
+
+  // If the history did not yet contain this trading day, apply the pending D+1 correction after verifying it.
+  if (!prior && pendingMarginCorrection !== null) {
+    prior = {
+      date,
+      marginBalanceYi: pendingMarginCorrection,
+      marginBalanceFinalized: true,
+      marginBalanceSource: 'next-trading-day-prior-balance'
+    };
+    byDate.set(date, prior);
+    pendingMarginCorrection = null;
   }
 
   let margin = null;
@@ -401,6 +509,7 @@ for (const date of candidates) {
   const advance = twse.listed.advance + (otc?.advance || 0);
   const decline = twse.listed.decline + (otc?.decline || 0);
   const unchanged = twse.listed.unchanged + (otc?.unchanged || 0);
+  const correctedBalance = prior?.marginBalanceFinalized === true;
   const merged = {
     ...(prior || {}),
     date,
@@ -410,15 +519,19 @@ for (const date of candidates) {
     decline,
     unchanged,
     breadthCoverage: otc ? '上市＋上櫃' : '僅上市',
-    marginBalanceYi: margin?.todayBalanceYi ?? prior?.marginBalanceYi ?? null,
+    marginBalanceYi: correctedBalance ? prior.marginBalanceYi : (margin?.todayBalanceYi ?? prior?.marginBalanceYi ?? null),
+    marginBalanceFinalized: correctedBalance,
+    marginBalanceSource: correctedBalance ? 'next-trading-day-prior-balance' : (margin ? 'same-day-preliminary' : prior?.marginBalanceSource || null),
+    marginPriorBalanceYi: margin?.priorBalanceYi ?? prior?.marginPriorBalanceYi ?? null,
     marginChangePct: margin?.deltaPct ?? prior?.marginChangePct ?? null,
     daytradeSharePct: daytrade?.volumeSharePct ?? prior?.daytradeSharePct ?? null,
     accountMonth: monthAvailableFromDate(date, accountHistory) || prior?.accountMonth || null,
     backfilled: true
   };
   byDate.set(date, merged);
+  pendingMarginCorrection = margin?.priorBalanceYi ?? null;
   fetchedDates++;
-  if (isComplete(merged)) completeCount++;
+  completeCount = [...byDate.values()].filter(isComplete).length;
   if (fetchedDates % 10 === 0) {
     console.log('歷史回補進度：新增/更新 ' + fetchedDates + ' 日；完整樣本 ' + completeCount + '/' + targetCompleteDays + '。');
   }
@@ -439,7 +552,7 @@ const breadthPctl = pctRank(priorBreadthRatios, currentDeclineRatio, 60);
 const downMovePctl = pctRank(priorDownMoves, currentDownMove, 60);
 const fearIndex = breadthPctl !== null && downMovePctl !== null ? Math.round((breadthPctl + downMovePctl) / 2) : null;
 
-const marginPoints = history.filter(item => Number.isFinite(item.marginBalanceYi));
+const marginPoints = history.filter(item => Number.isFinite(item.marginBalanceYi) && item.marginBalanceFinalized === true);
 const margin20Series = [];
 for (let i = 20; i < marginPoints.length; i++) {
   const start = marginPoints[i - 20].marginBalanceYi;
@@ -475,6 +588,8 @@ const sentiment = {
   heatStatus: heatIndex === null ? '樣本不足' : heatIndex >= 90 ? '極端過熱' : heatIndex >= 80 ? '偏熱' : heatIndex <= 20 ? '冷淡' : '中性區間',
   fearStatus: fearIndex === null ? '樣本不足' : fearIndex >= 90 ? '極端恐慌' : fearIndex >= 80 ? '恐慌偏高' : '未達恐慌門檻',
   heatComponents,
+  heatDataStatus: heatComponents.length === 3 ? '完整指標' : heatComponents.length >= 2 ? '部分指標暫定' : '樣本不足',
+  heatComponentCount: heatComponents.length,
   fearComponents: [
     { key: 'breadth', label: '下跌家數占比', value: currentDeclineRatio, percentile: breadthPctl, samples: priorBreadthRatios.length },
     { key: 'downMove', label: '指數單日跌幅', value: currentDownMove, percentile: downMovePctl, samples: priorDownMoves.length }
@@ -484,7 +599,7 @@ const sentiment = {
   accountMonths: accountHistory.length,
   targetCompleteDailySamples: targetCompleteDays,
   backfillStatus: completeDailySamples >= targetCompleteDays ? 'completed' : 'partial',
-  methodology: '群眾過熱：融資餘額20個有效交易觀測值變化、上市當沖成交股數占比、開戶總數月淨增率的歷史百分位加權；恐慌：上市＋上櫃下跌家數占比與指數單日跌幅的歷史百分位平均。每日比較至少60筆歷史樣本；開戶成長率至少12個前期月度樣本。'
+  methodology: '群眾過熱：融資餘額20個有效交易觀測值變化、上市當沖成交股數占比、開戶總數月淨增率的歷史百分位加權；未齊備時僅在至少兩項有效指標下重整權重，並標示為部分指標暫定。融資歷史只採用次一交易日「前日餘額」校正後的數值。恐慌：上市＋上櫃下跌家數占比與指數單日跌幅的歷史百分位平均。每日比較至少60筆歷史樣本；開戶成長率至少12個前期月度樣本。'
 };
 latest.normalized.sentiment = sentiment;
 latest.history = history;
