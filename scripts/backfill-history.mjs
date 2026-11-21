@@ -145,9 +145,12 @@ async function fetchTwseMargin(date) {
   const body = await fetchJson(url, 'TWSE MI_MARGN ' + date);
   const rows = Array.isArray(body.creditList) ? body.creditList : [];
   const row = rows.find(item => String(item?.[0] || '').includes('融資金額'));
-  if (!row || row.length < 6) throw new Error('融資金額統計列缺少欄位');
-  const priorThousand = number(row[4]);
-  const todayThousand = number(row[5]);
+  if (!row) throw new Error('融資金額統計列缺少欄位');
+  // Ignore empty cells exactly as the existing daily workflow does before selecting prior/today balances.
+  const amounts = row.slice(1).map(number).filter(value => value !== null);
+  if (amounts.length < 5) throw new Error('融資金額統計列數值欄位不足');
+  const priorThousand = amounts[3];
+  const todayThousand = amounts[4];
   if (!(priorThousand > 0) || !(todayThousand > 0)) throw new Error('融資餘額數值無效');
   return {
     date,
@@ -159,7 +162,8 @@ async function fetchTwseMargin(date) {
 }
 async function fetchTpexBreadth(date) {
   const [year, month, day] = dateParts(date);
-  const dayString = year + '/' + String(month).padStart(2, '0') + '/' + String(day).padStart(2, '0');
+  // TPEx historical daily pages use the Republic of China calendar year.
+  const dayString = (year - 1911) + '/' + String(month).padStart(2, '0') + '/' + String(day).padStart(2, '0');
   const url = 'https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php?l=zh-tw&d=' + encodeURIComponent(dayString) + '&se=EW&o=json';
   const body = await fetchJson(url, 'TPEx daily quotes ' + date);
   const tables = Array.isArray(body.tables) ? body.tables : [];
