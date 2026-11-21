@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'scripts/**'
       - '.github/workflows/update-market-data.yml'
   workflow_dispatch:
   schedule:
@@ -241,11 +242,11 @@ jobs:
           }
           async function getLatestAccounts(existingHistory = [], browser) {
             const reportsByMonth = new Map((Array.isArray(existingHistory) ? existingHistory : []).map(item => [item.month, { ...item, status: 'ok' }]));
-            const bootstrap = reportsByMonth.size < 12;
+            const bootstrap = reportsByMonth.size < 25;
             // TWSE says this monthly report is updated on the first trading day of the following month.
             // Start at the prior month so we do not repeatedly request an unpublished current-month report.
             const firstOffset = 1;
-            const maxOffset = bootstrap ? 19 : 6;
+            const maxOffset = bootstrap ? 31 : 6;
             let newestReport = null;
             const page = await browser.newPage({
               locale: 'zh-TW',
@@ -261,7 +262,7 @@ jobs:
                   reportsByMonth.set(report.month, report);
                   if (!newestReport || report.month > newestReport.month) newestReport = report;
                   if (!bootstrap && report.month <= (existingHistory.at(-1)?.month || '0000-00')) break;
-                  if (bootstrap && reportsByMonth.size >= 13) break;
+                  if (bootstrap && reportsByMonth.size >= 25) break;
                 } else {
                   console.log(`投資人開戶月報 ${m.key}: ${report.message}`);
                 }
@@ -466,6 +467,9 @@ jobs:
           for (const [key, meta] of Object.entries(sources)) console.log(`${key}: ${meta.status}, ${meta.records} rows, ${meta.message}`);
           console.log(`歷史交易日 ${trimmedHistory.length}；開戶月資料 ${updatedAccountHistory.length}；熱度指標 components ${heatComponents.length}`);
           NODE
+
+      - name: Backfill 90 trading days and recalculate sentiment
+        run: node scripts/backfill-history.mjs
 
       - name: Commit updated data files
         run: |
