@@ -30,6 +30,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js 24
         uses: actions/setup-node@v5
@@ -473,6 +475,7 @@ jobs:
 
       - name: Commit updated data files
         run: |
+          set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/
@@ -480,7 +483,28 @@ jobs:
             echo "No market data changes to commit."
           else
             git commit -m "Update Taiwan market sentiment data"
-            git push
+
+            # A developer may update the workflow while this data job is running.
+            # Rebase the generated-data commit onto the latest main before pushing.
+            for attempt in 1 2 3; do
+              git fetch origin main
+              if ! git rebase origin/main; then
+                echo "Rebase conflict detected; refusing to overwrite remote data."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin HEAD:main; then
+                echo "Market data commit pushed successfully."
+                exit 0
+              fi
+
+              echo "Push attempt ${attempt} rejected; refreshing origin/main and retrying."
+              sleep $((attempt * 2))
+            done
+
+            echo "Unable to push market data after 3 attempts."
+            exit 1
           fi
 
       - name: Prepare GitHub Pages website files
