@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-21T08:03:49.214Z",
+  "generatedAt": "2026-11-21T08:28:41.692Z",
   "tradingDate": "2026-11-20",
   "sources": {
     "index": {
@@ -7,35 +7,56 @@
       "status": "ok",
       "records": 267,
       "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/MI_INDEX",
-      "message": "已由 GitHub Actions 伺服器端取得"
+      "message": "由 GitHub Actions 伺服器端取得"
     },
     "stocks": {
       "label": "上市股票日成交資訊",
       "status": "ok",
       "records": 1393,
       "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
-      "message": "已由 GitHub Actions 伺服器端取得"
+      "message": "由 GitHub Actions 伺服器端取得"
     },
-    "margin": {
-      "label": "上市融資融券明細",
+    "marginDetails": {
+      "label": "上市個股融資融券明細",
       "status": "ok",
       "records": 1311,
       "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/MI_MARGN",
-      "message": "已由 GitHub Actions 伺服器端取得"
+      "message": "由 GitHub Actions 伺服器端取得"
     },
-    "daytrade": {
-      "label": "上市當沖統計",
+    "daytradeDetails": {
+      "label": "上市個股當沖明細",
       "status": "ok",
       "records": 1246,
       "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/TWTB4U",
-      "message": "已由 GitHub Actions 伺服器端取得"
+      "message": "由 GitHub Actions 伺服器端取得"
     },
     "tpex": {
       "label": "上櫃股票收盤行情",
       "status": "ok",
       "records": 13807,
       "endpoint": "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes",
-      "message": "已由 GitHub Actions 伺服器端取得"
+      "message": "由 GitHub Actions 伺服器端取得"
+    },
+    "marginSummary": {
+      "label": "上市融資餘額彙總",
+      "status": "ok",
+      "records": 1,
+      "endpoint": "https://www.twse.com.tw/exchangeReport/MI_MARGN?response=html&selectType=MS",
+      "message": "融資金額(仟元)彙總列；今日餘額可能於次日調整，前日餘額為較完整確認值。"
+    },
+    "daytradeSummary": {
+      "label": "上市當沖市場統計",
+      "status": "ok",
+      "records": 1,
+      "endpoint": "https://www.twse.com.tw/exchangeReport/TWTB4U2?date=20261120&response=html&stockNo=",
+      "message": "採證交所當沖市場統計表；成交股數占比與買賣成交金額占比分開呈現。"
+    },
+    "accounts": {
+      "label": "投資人開戶統計",
+      "status": "error",
+      "records": 0,
+      "endpoint": "",
+      "message": "最近六個月及歷史回補均未成功解析 TWSE 月報。"
     }
   },
   "normalized": {
@@ -67,14 +88,66 @@
       }
     },
     "margin": {
-      "records": 1311
+      "status": "ok",
+      "label": "上市融資餘額彙總",
+      "endpoint": "https://www.twse.com.tw/exchangeReport/MI_MARGN?response=html&selectType=MS",
+      "date": "2026-11-20",
+      "unit": "新臺幣億元",
+      "todayBalanceYi": 4352.27267,
+      "priorBalanceYi": 4843.6836,
+      "deltaYi": -491.41093,
+      "deltaPct": -10.145396986706567,
+      "quantityRowAvailable": true,
+      "message": "融資金額(仟元)彙總列；今日餘額可能於次日調整，前日餘額為較完整確認值。"
     },
     "daytrade": {
-      "records": 1246,
-      "marketPct": null
+      "status": "ok",
+      "label": "上市當沖市場統計",
+      "endpoint": "https://www.twse.com.tw/exchangeReport/TWTB4U2?date=20261120&response=html&stockNo=",
+      "date": "2026-11-20",
+      "volumeShares": 4460672000,
+      "volumeSharePct": 26.1,
+      "buyAmount": 322561954550,
+      "buyAmountSharePct": 34.48,
+      "sellAmount": 322720245100,
+      "sellAmountSharePct": 34.5,
+      "records": 17,
+      "message": "採證交所當沖市場統計表；成交股數占比與買賣成交金額占比分開呈現。"
+    },
+    "accounts": {
+      "status": "error",
+      "label": "投資人開戶統計",
+      "message": "最近六個月及歷史回補均未成功解析 TWSE 月報。"
+    },
+    "sentiment": {
+      "heatIndex": null,
+      "fearIndex": null,
+      "heatStatus": "樣本不足",
+      "fearStatus": "樣本不足",
+      "heatComponents": [],
+      "fearComponents": [
+        {
+          "key": "breadth",
+          "label": "下跌家數占比",
+          "value": 92.28673234122824,
+          "percentile": null,
+          "samples": 0
+        },
+        {
+          "key": "downMove",
+          "label": "指數單日跌幅",
+          "value": 6.23,
+          "percentile": null,
+          "samples": 0
+        }
+      ],
+      "dailySamples": 1,
+      "accountMonths": 0,
+      "methodology": "群眾熱度：融資餘額20日變化、上市當沖成交股數占比、月開戶總數淨增率的歷史百分位加權；恐慌程度：下跌家數占比與指數單日跌幅的歷史百分位平均。每日序列至少60筆、月開戶序列至少12期才納入。"
     }
   },
   "historyCount": 1,
+  "accountHistoryCount": 0,
   "history": [
     {
       "date": "2026-11-20",
@@ -82,7 +155,13 @@
       "changePct": -6.23,
       "advance": 368,
       "decline": 4403,
-      "unchanged": 141
+      "unchanged": 141,
+      "marginBalanceYi": 4352.27267,
+      "marginChangePct": -10.145396986706567,
+      "daytradeSharePct": 26.1,
+      "accountMonth": null,
+      "heatIndex": null,
+      "fearIndex": null
     }
   ]
 }

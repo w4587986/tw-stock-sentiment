@@ -5,6 +5,12 @@
     "changePct": -6.23,
     "advance": 368,
     "decline": 4403,
-    "unchanged": 141
+    "unchanged": 141,
+    "marginBalanceYi": 4352.27267,
+    "marginChangePct": -10.145396986706567,
+    "daytradeSharePct": 26.1,
+    "accountMonth": null,
+    "heatIndex": null,
+    "fearIndex": null
   }
 ]
