@@ -36,11 +36,17 @@ jobs:
           node-version: '24'
           package-manager-cache: false
 
+      - name: Install Chromium for TWSE interactive report
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+
       - name: Fetch official data and calculate indicators
         run: |
           mkdir -p data
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
+          import { chromium } from 'playwright';
 
           const BASE = 'https://openapi.twse.com.tw/v1';
           const SOURCES = [
@@ -186,52 +192,87 @@ jobs:
             }
           }
 
-          // 3) TWSE investor account age-distribution table: cumulative account count, published monthly.
-          async function fetchAccountMonth(monthKey) {
+          // 3) TWSE investor account age-distribution report is rendered client-side.
+          // A plain fetch() receives the page shell without the table, so use Chromium and read the rendered table.
+          async function fetchAccountMonth(monthKey, page) {
             const [year, month] = monthKey.split('-').map(Number);
             const url = `https://www.twse.com.tw/zh/trading/statistics/list02-264.html?date=${year}${String(month).padStart(2, '0')}01`;
             try {
-              const html = await fetchText(url, `投資人開戶統計 ${monthKey}`);
-              const text = htmlText(html);
-              const rocMonth = text.match(/(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*投資人開戶數年齡分布統計表/);
-              const returnedMonth = rocMonth ? `${Number(rocMonth[1]) + 1911}-${String(Number(rocMonth[2])).padStart(2, '0')}` : null;
-              if (returnedMonth && returnedMonth !== monthKey) throw new Error(`查詢 ${monthKey}，但頁面回傳 ${returnedMonth}`);
-              const rows = htmlRows(html);
-              const totalRow = rows.find(cells => cells.some(cell => /合計/.test(cell)) && numbersIn(cells).length >= 8);
-              if (!totalRow) throw new Error('找不到「開戶人數－合計」資料列，可能是頁面結構已變更');
-              const nums = numbersIn(totalRow);
+              const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+              if (response && !response.ok()) throw new Error(`頁面 HTTP ${response.status()}`);
+              await page.waitForFunction(() => {
+                const heading = document.body?.innerText || '';
+                const hasTotalRow = Array.from(document.querySelectorAll('tr')).some(tr => /合計/.test(tr.innerText || ''));
+                return heading.includes('投資人開戶數年齡分布統計表') && hasTotalRow;
+              }, null, { timeout: 18000 });
+              const extracted = await page.evaluate(() => {
+                const bodyText = document.body?.innerText || '';
+                const rows = Array.from(document.querySelectorAll('tr')).map(tr =>
+                  Array.from(tr.querySelectorAll('th, td')).map(cell => (cell.innerText || cell.textContent || '').trim()).filter(Boolean)
+                ).filter(cells => cells.length > 0);
+                return { bodyText, rows };
+              });
+              const monthMatch = extracted.bodyText.match(/(\d{3,4})\s*年\s*(\d{1,2})\s*月\s*投資人開戶數年齡分布統計表/);
+              let returnedMonth = monthKey;
+              if (monthMatch) {
+                const rawYear = Number(monthMatch[1]);
+                const fullYear = rawYear < 1911 ? rawYear + 1911 : rawYear;
+                returnedMonth = `${fullYear}-${String(Number(monthMatch[2])).padStart(2, '0')}`;
+              }
+              if (returnedMonth !== monthKey) throw new Error(`查詢 ${monthKey}，但頁面回傳 ${returnedMonth}`);
+
+              const totalRow = extracted.rows.find(cells => cells.some(cell => /^合計$/.test(cell.trim())));
+              if (!totalRow) throw new Error(`瀏覽器已載入頁面，但找不到「合計」列。頁面文字：${extracted.bodyText.slice(0, 500)}`);
+              const nums = totalRow.map(toNumber).filter(value => value !== null);
+              if (nums.length < 8) throw new Error(`合計列數值欄位不足（${nums.length}/8）：${totalRow.join(' | ')}`);
               const total = nums.at(-1);
-              const age20to30 = nums.length >= 8 ? nums[1] : null;
+              const age20to30 = nums[1];
               if (!(total > 0)) throw new Error('開戶總數為空或無效');
               return {
-                status: 'ok', month: returnedMonth || monthKey, totalAccounts: total,
+                status: 'ok', month: returnedMonth, totalAccounts: total,
                 age20to30Accounts: age20to30,
                 age20to30SharePct: age20to30 !== null ? age20to30 / total * 100 : null,
-                endpoint: url, message: 'TWSE 每月投資人開戶數年齡分布統計；總數是累計帳戶數，不是當月新開戶毛額。'
+                endpoint: url,
+                message: '使用 Chromium 等待 TWSE 動態頁面完成載入，再讀取年齡分布表「合計」列；總數為累計帳戶數，不是當月新開戶毛額。'
               };
             } catch (error) {
               return { status: 'error', month: monthKey, endpoint: url, message: String(error.message || error) };
             }
           }
-          async function getLatestAccounts(existingHistory = []) {
+          async function getLatestAccounts(existingHistory = [], browser) {
             const reportsByMonth = new Map((Array.isArray(existingHistory) ? existingHistory : []).map(item => [item.month, { ...item, status: 'ok' }]));
             const bootstrap = reportsByMonth.size < 12;
-            const maxOffset = bootstrap ? 18 : 5;
+            // TWSE says this monthly report is updated on the first trading day of the following month.
+            // Start at the prior month so we do not repeatedly request an unpublished current-month report.
+            const firstOffset = 1;
+            const maxOffset = bootstrap ? 19 : 6;
             let newestReport = null;
-            for (let offset = 0; offset <= maxOffset; offset++) {
-              const m = monthShift(yyyy, mm, -offset);
-              const report = await fetchAccountMonth(m.key);
-              if (report.status === 'ok') {
-                reportsByMonth.set(report.month, report);
-                if (!newestReport || report.month > newestReport.month) newestReport = report;
-                if (!bootstrap && reportsByMonth.has(report.month) && report.month <= (existingHistory.at(-1)?.month || '0000-00')) break;
-                if (bootstrap && reportsByMonth.size >= 13) break;
+            const page = await browser.newPage({
+              locale: 'zh-TW',
+              viewport: { width: 1440, height: 1000 },
+              userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
+            });
+            try {
+              await page.setExtraHTTPHeaders({ 'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8' });
+              for (let offset = firstOffset; offset <= maxOffset; offset++) {
+                const m = monthShift(yyyy, mm, -offset);
+                const report = await fetchAccountMonth(m.key, page);
+                if (report.status === 'ok') {
+                  reportsByMonth.set(report.month, report);
+                  if (!newestReport || report.month > newestReport.month) newestReport = report;
+                  if (!bootstrap && report.month <= (existingHistory.at(-1)?.month || '0000-00')) break;
+                  if (bootstrap && reportsByMonth.size >= 13) break;
+                } else {
+                  console.log(`投資人開戶月報 ${m.key}: ${report.message}`);
+                }
+                await sleep(650);
               }
-              // Avoid sending a burst of requests to the official monthly statistics page.
-              await sleep(450);
+            } finally {
+              await page.close();
             }
+
             const allReports = [...reportsByMonth.values()].sort((a, b) => String(a.month).localeCompare(String(b.month)));
-            const calculated = allReports.map((report, i) => {
+            const calculated = allReports.map(report => {
               const [year, month] = report.month.split('-').map(Number);
               const previousMonth = monthShift(year, month, -1).key;
               const previous = allReports.find(item => item.month === previousMonth);
@@ -245,7 +286,7 @@ jobs:
               };
             }).slice(-60);
             const latest = calculated.at(-1);
-            if (!latest) return { status: 'error', label: '投資人開戶統計', message: '最近六個月及歷史回補均未成功解析 TWSE 月報。' };
+            if (!latest) return { status: 'error', label: '投資人開戶統計', message: `最近月份及歷史回補均未成功解析 TWSE 動態月報。最新錯誤：${newestReport?.message || '請查看 Actions 日誌中的「投資人開戶月報」訊息。'}` };
             const previous = calculated.find(item => item.month === monthShift(...latest.month.split('-').map(Number), -1).key);
             const latestReport = {
               status: 'ok', label: '投資人開戶統計', month: latest.month,
@@ -316,9 +357,15 @@ jobs:
             listed: listedBreadth, otc: otcBreadth
           };
 
-          const [margin, daytrade, accounts] = await Promise.all([
-            getMarginSummary(), getDaytradeSummary(tradingDate), getLatestAccounts(accountHistory)
-          ]);
+          const accountBrowser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+          let margin, daytrade, accounts;
+          try {
+            [margin, daytrade, accounts] = await Promise.all([
+              getMarginSummary(), getDaytradeSummary(tradingDate), getLatestAccounts(accountHistory, accountBrowser)
+            ]);
+          } finally {
+            await accountBrowser.close();
+          }
           sources.marginSummary = { label: margin.label || '上市融資餘額彙總', status: margin.status === 'ok' && margin.date !== tradingDate ? 'stale' : margin.status, records: margin.status === 'ok' ? 1 : 0, endpoint: margin.endpoint || '', message: margin.status === 'ok' && margin.date !== tradingDate ? `來源日期 ${margin.date || '未知'} 與指數交易日 ${tradingDate} 不一致` : margin.message };
           sources.daytradeSummary = { label: daytrade.label || '上市當沖市場統計', status: daytrade.status === 'ok' && daytrade.date !== tradingDate ? 'stale' : daytrade.status, records: daytrade.status === 'ok' ? 1 : 0, endpoint: daytrade.endpoint || '', message: daytrade.status === 'ok' && daytrade.date !== tradingDate ? `來源日期 ${daytrade.date || '未知'} 與指數交易日 ${tradingDate} 不一致` : daytrade.message };
           sources.accounts = { label: accounts.label || '投資人開戶統計', status: accounts.status, records: accounts.status === 'ok' ? 1 : 0, endpoint: accounts.endpoint || '', message: accounts.message || accounts.previousMonthStatus || '' };
