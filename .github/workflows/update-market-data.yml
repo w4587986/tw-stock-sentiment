@@ -468,7 +468,7 @@ jobs:
           console.log(`歷史交易日 ${trimmedHistory.length}；開戶月資料 ${updatedAccountHistory.length}；熱度指標 components ${heatComponents.length}`);
           NODE
 
-      - name: Backfill 90 trading days and recalculate sentiment
+      - name: Backfill 120 trading days and recalculate sentiment
         run: node scripts/backfill-history.mjs
 
       - name: Commit updated data files
