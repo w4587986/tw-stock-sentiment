@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-11-21T10:15:34.119Z",
+  "generatedAt": "2026-11-21T10:32:12.577Z",
   "tradingDate": "2026-11-20",
   "targetCompleteDailySamples": 120,
-  "completeDailySamples": 1,
+  "completeDailySamples": 120,
   "historyRows": 177,
   "accountMonths": 15,
-  "fetchedDates": 176,
-  "skippedIndexDates": 10,
+  "fetchedDates": 120,
+  "skippedIndexDates": 9,
   "missingTpexDays": 0,
-  "missingMarginDays": 176,
+  "missingMarginDays": 0,
   "missingDaytradeDays": 0,
-  "status": "partial"
+  "status": "completed"
 }
