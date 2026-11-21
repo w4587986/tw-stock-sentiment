@@ -1,129 +1,77 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0b1220">
-<title>台股情緒監測站｜自動更新版</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b1220">
+<title>台股情緒監測站</title>
 <style>
 :root{color-scheme:dark;--bg:#0b1220;--panel:#121e30;--line:#293950;--txt:#eaf0f8;--muted:#9aabc0;--blue:#79aaff;--green:#45c99b;--amber:#f2bd60;--red:#ff7881}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 0,#1a2a43 0,transparent 38%),var(--bg);color:var(--txt);font:15px/1.55 system-ui,-apple-system,"Noto Sans TC",sans-serif}
 main{max-width:1160px;margin:auto;padding:25px 18px 55px}.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}.eyebrow{font-size:11px;letter-spacing:.16em;color:var(--blue);font-weight:700}.title{font-size:clamp(27px,4vw,38px);margin:6px 0}.muted{color:var(--muted)}.small{font-size:12px}.pill{border:1px solid var(--line);border-radius:99px;padding:7px 11px;color:var(--muted);font-size:12px}
-button,select{background:#1b2b42;color:var(--txt);border:1px solid #39506d;border-radius:9px;padding:9px 12px;font:inherit}button{cursor:pointer}button:hover{border-color:var(--blue)}button:disabled{opacity:.5;cursor:wait}
+button{background:#1b2b42;color:var(--txt);border:1px solid #39506d;border-radius:9px;padding:9px 12px;font:inherit;cursor:pointer}button:hover{border-color:var(--blue)}button:disabled{opacity:.5;cursor:wait}
 .hero{margin:22px 0 14px;border:1px solid #59482d;background:linear-gradient(115deg,#332b20,#17253a 72%);border-radius:17px;padding:20px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}.hero h2{font-size:23px;margin:4px 0}.hero p{margin:0;color:#c3cedc;max-width:760px}.verdict{font-weight:800;color:var(--amber)}.score{font-size:26px;font-weight:800;text-align:right}.score small{display:block;font-size:11px;color:var(--muted);font-weight:500}
 .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}.label{font-size:12px;color:var(--muted)}.value{font-size:25px;font-weight:800;margin:8px 0 1px;letter-spacing:-.03em;overflow-wrap:anywhere}.detail{font-size:12px;color:var(--muted)}.tag{display:inline-block;margin-top:9px;padding:3px 8px;border-radius:6px;font-size:11px;background:#26384f;color:#c9d9ed}.tag.good{background:#1b4038;color:#8ce2c5}.tag.warn{background:#453a27;color:#f6d28c}.tag.bad{background:#492b37;color:#ffb9be}
-.section{margin-top:24px}.sectionhead{display:flex;justify-content:space-between;align-items:end;gap:10px;margin-bottom:10px}.section h2{font-size:19px;margin:0}.two{display:grid;grid-template-columns:1.1fr .9fr;gap:12px}.table{width:100%;border-collapse:collapse;font-size:13px}.table td,.table th{text-align:left;padding:10px 7px;border-bottom:1px solid var(--line);vertical-align:top}.table th{color:var(--muted);font-weight:600}.state{white-space:nowrap;font-size:11px;border-radius:6px;padding:3px 7px;background:#293a51;color:#cad7e8}.state.ok{background:#1b4038;color:#8ce2c5}.state.bad{background:#492b37;color:#ffb9be}.state.warn{background:#453a27;color:#f6d28c}
-.actions{display:grid;gap:9px}.action{padding:12px 13px;border-radius:10px;background:#19283c;border-left:3px solid var(--amber)}.action b{display:block}.action span{font-size:12px;color:var(--muted)}
-.links{display:flex;gap:8px;flex-wrap:wrap}.links a{color:#a8c8ff;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12px}.links a:hover{background:#1a2a40}
-.log{max-height:190px;overflow:auto;font:12px/1.6 ui-monospace,monospace;color:#b9c8db;white-space:pre-wrap}.foot{border-top:1px solid var(--line);margin-top:24px;padding-top:15px;color:var(--muted);font-size:12px}
-@media(max-width:800px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}}
-@media(max-width:500px){main{padding:18px 12px 40px}.grid{gap:8px}.card{padding:12px}.value{font-size:21px}.hero{grid-template-columns:1fr;padding:16px}.score{text-align:left}.table{font-size:12px}.table td,.table th{padding:8px 5px}}
+.section{margin-top:24px}.sectionhead{display:flex;justify-content:space-between;align-items:end;gap:10px;margin-bottom:10px}.section h2{font-size:19px;margin:0}.two{display:grid;grid-template-columns:1.1fr .9fr;gap:12px}.table{width:100%;border-collapse:collapse;font-size:13px}.table td,.table th{ text-align:left;padding:10px 7px;border-bottom:1px solid var(--line);vertical-align:top}.table th{color:var(--muted);font-weight:600}.state{white-space:nowrap;font-size:11px;border-radius:6px;padding:3px 7px;background:#293a51;color:#cad7e8}.state.ok{background:#1b4038;color:#8ce2c5}.state.bad{background:#492b37;color:#ffb9be}.state.warn{background:#453a27;color:#f6d28c}.actions{display:grid;gap:9px}.action{padding:12px 13px;border-radius:10px;background:#19283c;border-left:3px solid var(--amber)}.action b{display:block}.action span{font-size:12px;color:var(--muted)}
+.links{display:flex;gap:8px;flex-wrap:wrap}.links a{color:#a8c8ff;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12px}.links a:hover{background:#1a2a40}.notice{background:#18283b;border:1px solid #35506c;border-radius:12px;padding:13px 15px;color:#c8d6e7;font-size:13px}.foot{border-top:1px solid var(--line);margin-top:24px;padding-top:15px;color:var(--muted);font-size:12px}
+@media(max-width:800px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}}@media(max-width:500px){main{padding:18px 12px 40px}.grid{gap:8px}.card{padding:12px}.value{font-size:21px}.hero{grid-template-columns:1fr;padding:16px}.score{text-align:left}.table{font-size:12px}.table td,.table th{padding:8px 5px}}
 </style></head>
 <body><main>
-<header class="top">
- <div><div class="eyebrow">TAIWAN EQUITY MARKET · SENTIMENT & RISK</div><h1 class="title">台股情緒監測站</h1><div class="muted">官方行情自動抓取・本機歷史追蹤・透明訊號規則</div></div>
- <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="pill" id="connection">尚未更新</span><button id="refresh">↻ 立即更新</button></div>
-</header>
-<section class="hero"><div><div class="verdict" id="verdict">正在讀取市場資料</div><h2 id="headline">等待官方資料回傳</h2><p id="summary">本頁不會用猜測補上缺失數據。各項資料會標示來源日期；尚未接入的資料會明確顯示「未取得」。</p></div><div class="score" id="risk">—<small>市場風險狀態</small></div></section>
-<section class="grid">
- <article class="card"><div class="label">加權指數</div><div class="value" id="index">—</div><div class="detail" id="indexDetail">等待資料</div><span class="tag" id="indexTag">未取得</span></article>
- <article class="card"><div class="label">融資餘額</div><div class="value" id="margin">—</div><div class="detail" id="marginDetail">等待資料</div><span class="tag" id="marginTag">未取得</span></article>
- <article class="card"><div class="label">市場漲跌家數</div><div class="value" id="breadth">—</div><div class="detail" id="breadthDetail">等待資料</div><span class="tag" id="breadthTag">未取得</span></article>
- <article class="card"><div class="label">當沖交易統計</div><div class="value" id="daytrade">—</div><div class="detail" id="daytradeDetail">等待資料</div><span class="tag" id="daytradeTag">未取得</span></article>
+<header class="top"><div><div class="eyebrow">TAIWAN EQUITY MARKET · SENTIMENT & RISK</div><h1 class="title">台股情緒監測站</h1><div class="muted">官方資料定期更新・市場風險與情緒觀察</div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="pill" id="connection">等待資料檔</span><button id="refresh">↻ 重新讀取</button></div></header>
+<section class="hero"><div><div class="verdict" id="verdict">尚未取得市場資料</div><h2 id="headline">等待首次自動更新</h2><p id="summary">資料會由 GitHub Actions 在伺服器端抓取，再由網站讀取同一個網站來源的 JSON 檔。請先執行一次資料更新工作流程。</p></div><div class="score" id="risk">—<small>市場風險狀態</small></div></section>
+<div class="notice" id="notice">首次設定：到 GitHub 儲存庫的 Actions 頁籤，執行「Update Taiwan market data」工作流程。成功後本頁會讀取 data/latest.json。</div>
+<section class="grid" style="margin-top:14px">
+<article class="card"><div class="label">加權指數</div><div class="value" id="index">—</div><div class="detail" id="indexDetail">等待資料</div><span class="tag" id="indexTag">未取得</span></article>
+<article class="card"><div class="label">融資融券資料</div><div class="value" id="margin">—</div><div class="detail" id="marginDetail">等待資料</div><span class="tag" id="marginTag">未取得</span></article>
+<article class="card"><div class="label">市場漲跌家數</div><div class="value" id="breadth">—</div><div class="detail" id="breadthDetail">等待資料</div><span class="tag" id="breadthTag">未取得</span></article>
+<article class="card"><div class="label">當沖資料</div><div class="value" id="daytrade">—</div><div class="detail" id="daytradeDetail">等待資料</div><span class="tag" id="daytradeTag">未取得</span></article>
 </section>
-<section class="section"><div class="sectionhead"><h2>六項情緒與風險指標</h2><span class="muted small" id="updated">尚未更新</span></div>
-<div class="card"><table class="table"><thead><tr><th>指標</th><th>最新狀態</th><th>判讀方式</th><th>資料狀態</th></tr></thead><tbody id="indicatorRows"></tbody></table></div></section>
-<section class="section two">
- <div class="card"><div class="sectionhead"><h2>本機歷史追蹤</h2><span class="muted small">只存在此瀏覽器</span></div><div class="value" id="samples">0 天</div><div class="detail" id="historyText">累積至少 60 個交易日後，才開始顯示本機歷史百分位參考。</div><div class="tag" id="historyTag">尚在累積</div></div>
- <div class="card"><div class="sectionhead"><h2>目前操作提示</h2><span class="muted small">非個人化投資建議</span></div><div class="actions" id="actions"><div class="action"><b>先取得資料</b><span>更新後才會產生市場狀態判讀。</span></div></div></div>
-</section>
-<section class="section"><div class="sectionhead"><h2>資料來源</h2><span class="muted small">官方 API 優先</span></div><div class="links">
-<a target="_blank" rel="noopener" href="https://openapi.twse.com.tw/">TWSE OpenAPI ↗</a><a target="_blank" rel="noopener" href="https://www.tpex.org.tw/openapi/">TPEx OpenAPI ↗</a><a target="_blank" rel="noopener" href="https://www.tdcc.com.tw/portal/zh/smWeb/qryStock">TDCC 股權分散 ↗</a><a target="_blank" rel="noopener" href="https://trends.google.com/trends/">Google Trends ↗</a><a target="_blank" rel="noopener" href="https://www.twse.com.tw/zh/trading/statistics/list02-264.html">TWSE 開戶統計 ↗</a>
-</div></section>
-<section class="section"><div class="sectionhead"><h2>資料連線紀錄</h2><span class="muted small">API 失敗時會保留原因</span></div><div class="card log" id="log">尚無連線紀錄</div></section>
-<footer class="foot"><b>重要限制：</b>此版本直接從瀏覽器讀取證交所公開 API，開啟頁面後自動更新，每 30 分鐘嘗試刷新；每日成功資料會保存在此瀏覽器的 localStorage。清除瀏覽器資料、換裝置或換瀏覽器不會同步歷史紀錄。開戶數、完整 TDCC 股權分散、Google Trends、上市櫃合併的歷史市場廣度尚未接入穩定且可直接呼叫的 API，因此不會假裝有即時數值。要做到跨裝置、背景排程、永久歷史資料與推播，需要部署後端資料庫及排程服務。訊號是研究輔助，不保證預測漲跌。</footer>
+<section class="section"><div class="sectionhead"><h2>資料來源狀態</h2><span class="muted small" id="updated">尚未更新</span></div><div class="card"><table class="table"><thead><tr><th>來源</th><th>資料量</th><th>抓取狀態</th><th>資料說明</th></tr></thead><tbody id="sourceRows"><tr><td colspan="4">尚未讀取資料檔</td></tr></tbody></table></div></section>
+<section class="section two"><div class="card"><div class="sectionhead"><h2>本機歷史資料</h2><span class="muted small">伺服器累積版本</span></div><div class="value" id="samples">—</div><div class="detail" id="historyText">讀取歷史資料中</div><span class="tag" id="historyTag">等待資料</span></div><div class="card"><div class="sectionhead"><h2>目前操作提示</h2><span class="muted small">非個人化投資建議</span></div><div class="actions" id="actions"><div class="action"><b>等待資料</b><span>尚無可用數據，暫不產生買賣訊號。</span></div></div></div></section>
+<section class="section"><div class="sectionhead"><h2>資料來源</h2><span class="muted small">官方公開資料</span></div><div class="links"><a target="_blank" rel="noopener" href="https://openapi.twse.com.tw/">TWSE OpenAPI ↗</a><a target="_blank" rel="noopener" href="https://www.tpex.org.tw/openapi/">TPEx OpenAPI ↗</a><a target="_blank" rel="noopener" href="https://www.tdcc.com.tw/portal/zh/smWeb/qryStock">TDCC 股權分散 ↗</a><a target="_blank" rel="noopener" href="https://trends.google.com/trends/">Google Trends ↗</a><a target="_blank" rel="noopener" href="https://www.twse.com.tw/zh/trading/statistics/list02-264.html">TWSE 開戶統計 ↗</a></div></section>
+<footer class="foot"><b>資料更新方式：</b>GitHub Actions 預設於台灣時間平日約 17:30 執行，並可由使用者手動執行。排程執行時間可能延遲；週末及休市日不會有新的交易資料。資料檔會隨 GitHub 儲存庫保存並可跨裝置讀取。若某個官方端點暫時失敗，該指標會標示未取得，不會用舊資料偽裝成最新資料。此網站為市場研究輔助，不構成個人化投資建議或保證收益。</footer>
 </main>
 <script>
-const BASE='https://openapi.twse.com.tw/v1';
-const ENDPOINTS=[
- ['大盤指數',`${BASE}/exchangeReport/MI_INDEX`],
- ['融資融券',`${BASE}/exchangeReport/MI_MARGN`],
- ['市場漲跌統計',`${BASE}/opendata/twtazu_od`],
- ['當沖資料',`${BASE}/exchangeReport/TWTB4U`],
- ['每日市場成交',`${BASE}/exchangeReport/FMTQIK`]
-];
-const $=id=>document.getElementById(id), fmt=n=>Number(n).toLocaleString('zh-TW',{maximumFractionDigits:2});
-const clean=v=>String(v??'').replace(/,/g,'').replace(/[％%]/g,'').trim();
-const num=v=>{let n=Number(clean(v));return Number.isFinite(n)?n:null};
-const logLines=[];
-function log(s){logLines.unshift(new Date().toLocaleTimeString('zh-TW')+' '+s);$('log').textContent=logLines.slice(0,35).join('\n')}
-function getVal(obj,terms){for(const [k,v] of Object.entries(obj||{})){if(terms.some(t=>k.toLowerCase().includes(t.toLowerCase()))){let n=num(v);if(n!==null)return {key:k,value:n,raw:v}}}return null}
-function findRow(rows,terms){return (rows||[]).find(r=>Object.values(r).some(v=>terms.some(t=>String(v).includes(t))))}
-function firstNumber(row,terms){return row?getVal(row,terms):null}
-function setCard(id,value,detail,tag,kind=''){ $(id).textContent=value;$(id+'Detail').textContent=detail;let t=$(id+'Tag');t.textContent=tag;t.className='tag '+kind}
-function parseIndex(rows){
- let row=findRow(rows,['發行量加權股價指數','加權股價指數']);
- if(!row)return null;
- let close=firstNumber(row,['收盤指數','收盤']);let change=firstNumber(row,['漲跌點數','漲跌點']);
- let pct=firstNumber(row,['漲跌百分比','漲跌幅']);
- return close?{close:close.value,change:change?.value,pct:pct?.value,date:Object.values(row)[0],row}:null;
-}
-function parseMargin(rows){
- let row=findRow(rows,['融資金額','融資餘額','融資今日餘額'])||rows?.[0]; if(!row)return null;
- let bal=firstNumber(row,['融資今日餘額','融資餘額','融資金額']);let change=firstNumber(row,['融資增減','融資餘額增減']);
- return bal?{balance:bal.value,change:change?.value,row}:null;
-}
-function parseBreadth(rows){
- let row=rows?.[0]; if(!row)return null;
- let adv=firstNumber(row,['上漲家數','漲家數','上漲數']);let dec=firstNumber(row,['下跌家數','跌家數','下跌數']);let unchanged=firstNumber(row,['持平家數','平盤家數']);
- if(!adv||!dec){let all=rows.find(r=>Object.keys(r).some(k=>k.includes('上漲'))&&Object.keys(r).some(k=>k.includes('下跌')));if(all){adv=firstNumber(all,['上漲']);dec=firstNumber(all,['下跌']);unchanged=firstNumber(all,['持平','平盤'])}}
- return adv&&dec?{adv:adv.value,dec:dec.value,unchanged:unchanged?.value,row:row}:null;
-}
-function parseDaytrade(rows){
- if(!rows?.length)return null;
- let keys=Object.keys(rows[0]);let matching=keys.filter(k=>/當沖|沖銷/.test(k));
- return matching.length?{fields:matching.slice(0,5),rows:rows.length,row:rows[0]}:null;
-}
-function saveSnapshot(s){
- try{let h=JSON.parse(localStorage.getItem('tw_sentiment_history')||'[]');let d=new Date().toISOString().slice(0,10);h=h.filter(x=>x.date!==d);h.push({...s,date:d});h=h.slice(-400);localStorage.setItem('tw_sentiment_history',JSON.stringify(h));return h}catch(e){return []}
-}
-function pctRank(values,x){let a=values.filter(Number.isFinite).sort((a,b)=>a-b);if(a.length<20)return null;return Math.round(a.filter(v=>v<=x).length/a.length*100)}
-function renderIndicators(d){
- const items=[
- ['散戶新增開戶','尚未串接','需接入官方月報並比較 12 個月季節性調整後變化','未取得',''],
- ['小額持股人數／股權分散','尚未串接','TDCC 每週資料；需比較小額級距持有人與持股比例','未取得',''],
- ['融資槓桿',d.margin?fmt(d.margin.balance):'尚未取得','追蹤融資餘額變化及融資／市值比；目前 API 欄位需確認','已連線／待驗證','warn'],
- ['當沖投機熱度',d.daytrade?`${d.daytrade.rows} 筆標的資料`:'尚未取得','需計算全市場當沖成交金額占比並與歷史分位比較','已連線／待驗證','warn'],
- ['搜尋熱度','尚未串接','Google Trends 公開網頁不是穩定免金鑰即時 API','未取得',''],
- ['估值與市場廣度',d.breadth?`上漲 ${fmt(d.breadth.adv)}／下跌 ${fmt(d.breadth.dec)}`:'尚未取得','廣度需合併上市與上櫃，並觀察多日變化','已連線／待驗證','warn']
- ];
- $('indicatorRows').innerHTML=items.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td><td><span class="state ${x[4]}">${x[3]}</span></td></tr>`).join('');
-}
-function decide(d,hist){
+const $=id=>document.getElementById(id);
+const nfmt=n=>Number(n).toLocaleString('zh-TW',{maximumFractionDigits:2});
+function setCard(id,value,detail,tag,kind=''){ $(id).textContent=value;$(id+'Detail').textContent=detail;const t=$(id+'Tag');t.textContent=tag;t.className='tag '+kind; }
+function sourceStatus(s){return s&&s.status==='ok'?`<span class="state ok">成功</span>`:`<span class="state bad">失敗／未取得</span>`}
+function classifySignal(data){
+ const idx=data.index, b=data.breadth;
  let risk=0, reasons=[];
- if(d.index?.pct!==undefined&&d.index.pct!==null&&d.index.pct<=-3){risk+=2;reasons.push('大盤單日跌幅達 3% 以上，短線波動風險升高')}
- if(d.breadth&&d.breadth.adv+d.breadth.dec>0){let ratio=d.breadth.adv/(d.breadth.adv+d.breadth.dec);if(ratio<.2){risk+=2;reasons.push('下跌家數明顯多於上漲家數，市場廣度偏弱')}else if(ratio>.8){risk+=1;reasons.push('上漲家數高度集中，需觀察是否過熱')}}
- if(d.margin?.change!==null&&d.margin?.change!==undefined&&d.margin.change<0){reasons.push('融資餘額減少，可能反映槓桿收縮；需連續數日確認')}
- let verdict='資料不足，暫不產生買賣訊號',headline='等待更多可驗證資料',riskLabel='尚未評級',summary='目前部分關鍵指標未接入，系統不會僅憑單一指標宣稱買進或賣出。';
- if(d.index&&d.breadth){if(risk>=3){verdict='觀望／控制風險';headline='市場短線風險偏高';riskLabel='偏高';summary='目前價格波動或市場廣度顯示壓力。避免因跌深而一次重倉；持有槓桿部位者先檢查風險。'}else{verdict='中性觀察';headline='尚無足夠證據確認轉折';riskLabel='中性';summary='目前沒有足夠的同步指標確認市場過熱或底部。分批計畫應搭配自身風險承受度，等待趨勢與廣度確認。'}}
- if(reasons.length===0)reasons.push('暫無足夠訊號；請等待更多資料與歷史樣本');
- $('verdict').textContent='目前訊號：'+verdict;$('headline').textContent=headline;$('summary').textContent=summary;$('risk').innerHTML=riskLabel+'<small>市場風險狀態</small>';
- $('actions').innerHTML=reasons.map(r=>`<div class="action"><b>${r}</b><span>這是風險描述，不是單獨的買賣指令。</span></div>`).join('');
+ if(idx&&Number.isFinite(idx.changePct)&&idx.changePct<=-3){risk+=2;reasons.push('大盤單日跌幅達 3% 以上，短線波動風險升高。')}
+ if(b&&b.total>0){const ratio=b.advance/b.total;if(ratio<0.2){risk+=2;reasons.push('上漲家數比例低於 20%，市場廣度明顯偏弱。')}else if(ratio>0.8){risk+=1;reasons.push('上漲家數比例高於 80%，需觀察是否過熱。')}}
+ let verdict='資料不足，暫不產生買賣訊號', headline='等待更多可驗證資料', label='尚未評級', summary='目前仍缺少完整的市場情緒、估值與長期歷史百分位資料，不會只憑一個數字給出買進或賣出指令。';
+ if(idx){
+   if(risk>=3){verdict='觀望／控制風險';headline='市場短線風險偏高';label='偏高';summary='目前指數走勢或市場廣度顯示壓力。避免因跌深而一次重倉；持有槓桿部位者先檢查風險。'}
+   else if(b){verdict='中性觀察';headline='暫無足夠證據確認轉折';label='中性';summary='目前沒有足夠的同步指標確認市場過熱或底部。可依預先規劃分批，等待趨勢與廣度改善。'}
+   else {verdict='資料不完整，先觀察';headline='只取得大盤指數';label='未完整';summary='指數資料已取得，但市場廣度或其他指標尚未到位，因此不產生買賣結論。'}
+ }
+ $('verdict').textContent='目前訊號：'+verdict;$('headline').textContent=headline;$('summary').textContent=summary;$('risk').innerHTML=label+'<small>市場風險狀態</small>';
+ $('actions').innerHTML=(reasons.length?reasons:['目前缺少足夠的同步資料，請勿把單日漲跌當成買賣訊號。']).map(x=>`<div class="action"><b>${x}</b><span>這是市場風險描述，不是單獨的買賣指令。</span></div>`).join('');
 }
-async function refresh(){
- const btn=$('refresh');btn.disabled=true;$('connection').textContent='正在連線官方資料…';let d={};
- const results=await Promise.allSettled(ENDPOINTS.map(async ([name,url])=>{let res=await fetch(url,{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);let json=await res.json();if(!Array.isArray(json))throw new Error('回傳格式非陣列');log(name+'：成功，'+json.length+' 筆');return json}));
- results.forEach((r,i)=>{if(r.status==='fulfilled')d[ENDPOINTS[i][0]]=r.value;else log(ENDPOINTS[i][0]+'：失敗 '+r.reason.message)});
- let idx=parseIndex(d['大盤指數']||[]);let mar=parseMargin(d['融資融券']||[]);let br=parseBreadth(d['市場漲跌統計']||[]);let dt=parseDaytrade(d['當沖資料']||[]);
- d.index=idx;d.margin=mar;d.breadth=br;d.daytrade=dt;
- if(idx){setCard('index',fmt(idx.close),`漲跌 ${idx.change===undefined?'—':fmt(idx.change)} 點；漲跌幅 ${idx.pct===undefined?'—':idx.pct+'%'}`,'官方行情','good')}else setCard('index','未取得','API 已回應但未辨識指數欄位','欄位待確認','warn');
- if(mar){setCard('margin',fmt(mar.balance),`欄位：${mar.row?Object.keys(mar.row).slice(0,3).join('、'):''}`,'已讀取／待核對','warn')}else setCard('margin','未取得','融資欄位尚未辨識','待確認','');
- if(br){setCard('breadth',`${fmt(br.adv)} / ${fmt(br.dec)}`,'上漲家數 / 下跌家數','已讀取／待核對','warn')}else setCard('breadth','未取得','尚未辨識漲跌家數欄位','待確認','');
- if(dt){setCard('daytrade',`${dt.rows} 筆`,'當沖標的資料筆數；非全市場占比','已讀取／待計算','warn')}else setCard('daytrade','未取得','尚未辨識當沖統計欄位','待確認','');
- let history=saveSnapshot({index:idx?.close,pct:idx?.pct,margin:mar?.balance,advance:br?.adv,decline:br?.dec});
- $('samples').textContent=history.length+' 天';$('historyText').textContent=history.length>=60?'已有至少 60 筆本機日資料；可進一步計算個別欄位歷史分位。':'歷史資料尚不足 60 天。請固定使用同一瀏覽器，並在交易日開啟此頁讓它累積資料。';
- $('historyTag').textContent=history.length>=60?'可開始估算分位':'尚在累積';renderIndicators(d);decide(d,history);
- let now=new Date();$('updated').textContent='最後嘗試更新：'+now.toLocaleString('zh-TW');$('connection').textContent=results.some(r=>r.status==='fulfilled')?'已連線（部分欄位待驗證）':'連線失敗／請用 HTTPS 開啟';btn.disabled=false;
+async function loadData(){
+ const btn=$('refresh');btn.disabled=true;$('connection').textContent='讀取資料檔…';
+ try{
+   const res=await fetch('./data/latest.json?ts='+Date.now(),{cache:'no-store'});
+   if(!res.ok)throw new Error('找不到 data/latest.json（HTTP '+res.status+'）。請先執行 GitHub Actions 工作流程。');
+   const data=await res.json();
+   const idx=data.normalized?.index||null, b=data.normalized?.breadth||null, m=data.normalized?.margin||null, d=data.normalized?.daytrade||null;
+   if(idx){setCard('index',nfmt(idx.close),`${idx.date||'日期未知'}｜漲跌 ${idx.changePoints==null?'—':nfmt(idx.changePoints)} 點（${idx.changePct==null?'—':idx.changePct+'%'}）`,'官方資料','good')}
+   else setCard('index','未取得','指數資料尚未由更新工作流程擷取','待確認','bad');
+   if(m?.records>0){setCard('margin',`${nfmt(m.records)} 筆`,'已取得上市個股融資融券明細；尚未計算全市場金額合計','資料已取得','good')}
+   else setCard('margin','未取得','官方融資融券端點未成功回傳','待確認','bad');
+   if(b?.total>0){setCard('breadth',`${nfmt(b.advance)} / ${nfmt(b.decline)}`,`上漲 / 下跌｜涵蓋 ${b.coverage||'部分市場'} ${nfmt(b.total)} 檔`,'已計算','good')}
+   else setCard('breadth','未取得','尚未辨識上市／上櫃漲跌欄位','待確認','bad');
+   if(d?.marketPct!=null){setCard('daytrade',`${d.marketPct}%`,'當沖成交股數占市場比重','取得市場統計','good')}
+   else if(d?.records>0){setCard('daytrade',`${nfmt(d.records)} 筆`,'已取得當沖端點；市場比重欄位尚待確認','資料已取得','warn')}
+   else setCard('daytrade','未取得','官方當沖端點未成功回傳','待確認','bad');
+   const rows=Object.entries(data.sources||{}).map(([key,s])=>`<tr><td>${s.label||key}</td><td>${s.records??'—'}</td><td>${sourceStatus(s)}</td><td>${s.message||s.endpoint||''}</td></tr>`).join('');
+   $('sourceRows').innerHTML=rows||'<tr><td colspan="4">沒有資料來源紀錄</td></tr>';
+   $('updated').textContent=`最後抓取：${data.generatedAt?new Date(data.generatedAt).toLocaleString('zh-TW'):'未知'}｜交易日：${idx?.date||'未知'}`;
+   const count=data.historyCount||0;$('samples').textContent=count+' 個交易日';$('historyText').textContent=count>=60?'已累積至少 60 個交易日，可逐步建立歷史百分位分析。':`目前累積 ${count} 個交易日；長期分位分析仍需更多樣本。`;$('historyTag').textContent=count>=60?'樣本初步足夠':'持續累積';
+   classifySignal({index:idx,breadth:b});
+   $('connection').textContent='資料檔讀取成功';$('notice').textContent='資料已載入。若資料日期不是最近交易日，請到 GitHub Actions 手動執行一次更新，並確認最新工作流程成功。';
+ }catch(e){$('connection').textContent='尚未取得資料';$('verdict').textContent='目前訊號：資料連線尚未完成';$('headline').textContent='尚未找到自動更新資料檔';$('summary').textContent=e.message;$('notice').textContent='下一步：到 GitHub 儲存庫的 Actions 頁籤，執行「Update Taiwan market data」。首次執行後會自動建立 data/latest.json。';$('actions').innerHTML='<div class="action"><b>先執行資料更新工作流程</b><span>完成後重新整理本頁即可載入資料。</span></div>';}
+ finally{btn.disabled=false;}
 }
-$('refresh').addEventListener('click',refresh);
-refresh();setInterval(refresh,30*60*1000);
+$('refresh').addEventListener('click',loadData);loadData();setInterval(loadData,30*60*1000);
 </script></body></html>
