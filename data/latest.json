@@ -1,0 +1,88 @@
+{
+  "generatedAt": "2026-11-21T08:01:34.625Z",
+  "tradingDate": "2026-11-20",
+  "sources": {
+    "index": {
+      "label": "加權指數",
+      "status": "ok",
+      "records": 267,
+      "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/MI_INDEX",
+      "message": "已由 GitHub Actions 伺服器端取得"
+    },
+    "stocks": {
+      "label": "上市股票日成交資訊",
+      "status": "ok",
+      "records": 1393,
+      "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+      "message": "已由 GitHub Actions 伺服器端取得"
+    },
+    "margin": {
+      "label": "上市融資融券明細",
+      "status": "ok",
+      "records": 1311,
+      "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/MI_MARGN",
+      "message": "已由 GitHub Actions 伺服器端取得"
+    },
+    "daytrade": {
+      "label": "上市當沖統計",
+      "status": "ok",
+      "records": 1246,
+      "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/TWTB4U",
+      "message": "已由 GitHub Actions 伺服器端取得"
+    },
+    "tpex": {
+      "label": "上櫃股票收盤行情",
+      "status": "ok",
+      "records": 13807,
+      "endpoint": "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes",
+      "message": "已由 GitHub Actions 伺服器端取得"
+    }
+  },
+  "normalized": {
+    "index": {
+      "date": "2026-11-20",
+      "close": 36033.29,
+      "changePoints": -2393.6,
+      "changePct": -6.23
+    },
+    "breadth": {
+      "advance": 368,
+      "decline": 4403,
+      "unchanged": 141,
+      "total": 4912,
+      "coverage": "上市＋上櫃",
+      "listed": {
+        "market": "上市",
+        "advance": 39,
+        "decline": 1314,
+        "unchanged": 40,
+        "examined": 1393
+      },
+      "otc": {
+        "market": "上櫃",
+        "advance": 329,
+        "decline": 3089,
+        "unchanged": 101,
+        "examined": 3519
+      }
+    },
+    "margin": {
+      "records": 1311
+    },
+    "daytrade": {
+      "records": 1246,
+      "marketPct": null
+    }
+  },
+  "historyCount": 1,
+  "history": [
+    {
+      "date": "2026-11-20",
+      "close": 36033.29,
+      "changePct": -6.23,
+      "advance": 368,
+      "decline": 4403,
+      "unchanged": 141
+    }
+  ]
+}
