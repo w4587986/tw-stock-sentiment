@@ -1,5 +1,21 @@
 [
   {
+    "month": "2024-06",
+    "totalAccounts": 12896008,
+    "age20to30Accounts": 1602533,
+    "age20to30SharePct": 12.426581931400788,
+    "netChangeAccounts": null,
+    "netChangePct": null
+  },
+  {
+    "month": "2024-07",
+    "totalAccounts": 12975480,
+    "age20to30Accounts": 1632678,
+    "age20to30SharePct": 12.582794624938732,
+    "netChangeAccounts": 79472,
+    "netChangePct": 0.6162527194462086
+  },
+  {
     "month": "2025-08",
     "totalAccounts": 13567161,
     "age20to30Accounts": 1709556,
