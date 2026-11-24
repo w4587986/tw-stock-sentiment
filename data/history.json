@@ -3210,5 +3210,22 @@
     "breadthCoverage": "上市＋上櫃",
     "marginPriorBalanceYi": 4352.27252,
     "marginBalanceFinalized": false
+  },
+  {
+    "date": "2026-11-24",
+    "close": 40122.35,
+    "changePct": 8.99,
+    "advance": 4274,
+    "decline": 217,
+    "unchanged": 83,
+    "marginBalanceYi": 4535.05173,
+    "marginChangePct": 4.540642786409221,
+    "daytradeSharePct": 17.72,
+    "accountMonth": "2026-10",
+    "heatIndex": 6,
+    "fearIndex": 26,
+    "breadthCoverage": "上市＋上櫃",
+    "marginPriorBalanceYi": 4338.07523,
+    "marginBalanceFinalized": false
   }
 ]
