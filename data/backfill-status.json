@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-11-26T22:51:11.190Z",
-  "tradingDate": "2026-11-26",
+  "generatedAt": "2026-11-27T22:31:13.511Z",
+  "tradingDate": "2026-11-27",
   "targetCompleteDailySamples": 120,
   "completeDailySamples": 120,
-  "historyRows": 181,
+  "historyRows": 182,
   "accountMonths": 17,
   "fetchedDates": 0,
   "skippedIndexDates": 0,

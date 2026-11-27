@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-26T22:51:11.190Z",
-  "tradingDate": "2026-11-26",
+  "generatedAt": "2026-11-27T22:31:13.511Z",
+  "tradingDate": "2026-11-27",
   "sources": {
     "index": {
       "label": "加權指數",
@@ -26,14 +26,14 @@
     "daytradeDetails": {
       "label": "上市個股當沖明細",
       "status": "ok",
-      "records": 1243,
+      "records": 1244,
       "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/TWTB4U",
       "message": "由 GitHub Actions 伺服器端取得"
     },
     "tpex": {
       "label": "上櫃股票收盤行情",
       "status": "ok",
-      "records": 13832,
+      "records": 13690,
       "endpoint": "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes",
       "message": "由 GitHub Actions 伺服器端取得"
     },
@@ -48,7 +48,7 @@
       "label": "上市當沖市場統計",
       "status": "ok",
       "records": 1,
-      "endpoint": "https://www.twse.com.tw/exchangeReport/TWTB4U2?date=20261126&response=html&stockNo=",
+      "endpoint": "https://www.twse.com.tw/exchangeReport/TWTB4U2?date=20261127&response=html&stockNo=",
       "message": "採證交所當沖市場統計表；成交股數占比與買賣成交金額占比分開呈現。"
     },
     "accounts": {
@@ -61,57 +61,57 @@
   },
   "normalized": {
     "index": {
-      "date": "2026-11-26",
-      "close": 39151.81,
-      "changePoints": 956.38,
-      "changePct": 2.5
+      "date": "2026-11-27",
+      "close": 39308.08,
+      "changePoints": 156.27,
+      "changePct": 0.4
     },
     "breadth": {
-      "advance": 4121,
-      "decline": 853,
-      "unchanged": 328,
-      "total": 5302,
+      "advance": 1787,
+      "decline": 2672,
+      "unchanged": 512,
+      "total": 4971,
       "coverage": "上市＋上櫃",
       "listed": {
         "market": "上市",
-        "advance": 1210,
-        "decline": 120,
-        "unchanged": 65,
+        "advance": 581,
+        "decline": 678,
+        "unchanged": 136,
         "examined": 1395
       },
       "otc": {
         "market": "上櫃",
-        "advance": 2911,
-        "decline": 733,
-        "unchanged": 263,
-        "examined": 3907
+        "advance": 1206,
+        "decline": 1994,
+        "unchanged": 376,
+        "examined": 3576
       }
     },
     "margin": {
       "status": "ok",
       "label": "上市融資餘額彙總",
       "endpoint": "https://www.twse.com.tw/exchangeReport/MI_MARGN?response=html&selectType=MS",
-      "date": "2026-11-26",
+      "date": "2026-11-27",
       "unit": "新臺幣億元",
-      "todayBalanceYi": 4344.84476,
-      "priorBalanceYi": 4341.37987,
-      "deltaYi": 3.46489,
-      "deltaPct": 0.0798107998782438,
+      "todayBalanceYi": 4301.71978,
+      "priorBalanceYi": 4344.84476,
+      "deltaYi": -43.12498,
+      "deltaPct": -0.9925551402209409,
       "quantityRowAvailable": true,
       "message": "融資金額(仟元)彙總列；今日餘額可能於次日調整，前日餘額為較完整確認值。"
     },
     "daytrade": {
       "status": "ok",
       "label": "上市當沖市場統計",
-      "endpoint": "https://www.twse.com.tw/exchangeReport/TWTB4U2?date=20261126&response=html&stockNo=",
-      "date": "2026-11-26",
-      "volumeShares": 3855972000,
-      "volumeSharePct": 32.78,
-      "buyAmount": 398110093500,
-      "buyAmountSharePct": 47.09,
-      "sellAmount": 399468563620,
-      "sellAmountSharePct": 47.25,
-      "records": 21,
+      "endpoint": "https://www.twse.com.tw/exchangeReport/TWTB4U2?date=20261127&response=html&stockNo=",
+      "date": "2026-11-27",
+      "volumeShares": 2733069000,
+      "volumeSharePct": 31.5,
+      "buyAmount": 318410817520,
+      "buyAmountSharePct": 45.83,
+      "sellAmount": 319022566970,
+      "sellAmountSharePct": 45.92,
+      "records": 22,
       "message": "採證交所當沖市場統計表；成交股數占比與買賣成交金額占比分開呈現。"
     },
     "accounts": {
@@ -269,7 +269,7 @@
     },
     "sentiment": {
       "heatIndex": 45,
-      "fearIndex": 39,
+      "fearIndex": 76,
       "heatStatus": "中性區間",
       "fearStatus": "未達恐慌門檻",
       "heatComponents": [
@@ -285,10 +285,10 @@
         {
           "key": "daytrade",
           "label": "當沖成交股數占比",
-          "value": 32.78,
+          "value": 31.5,
           "unit": "%",
-          "percentile": 98.88888888888889,
-          "samples": 180,
+          "percentile": 97.79005524861878,
+          "samples": 181,
           "weight": 0.4
         },
         {
@@ -307,19 +307,19 @@
         {
           "key": "breadth",
           "label": "下跌家數占比",
-          "value": 17.149175713711298,
-          "percentile": 25,
-          "samples": 180
+          "value": 59.92374971966809,
+          "percentile": 98.89502762430939,
+          "samples": 181
         },
         {
           "key": "downMove",
           "label": "指數單日跌幅",
           "value": 0,
-          "percentile": 52.22222222222223,
-          "samples": 180
+          "percentile": 52.48618784530387,
+          "samples": 181
         }
       ],
-      "dailySamples": 181,
+      "dailySamples": 182,
       "completeDailySamples": 120,
       "accountMonths": 17,
       "targetCompleteDailySamples": 120,
@@ -327,7 +327,7 @@
       "methodology": "群眾過熱：融資餘額20個有效交易觀測值變化、上市當沖成交股數占比、開戶總數月淨增率的歷史百分位加權；未齊備時僅在至少兩項有效指標下重整權重，並標示為部分指標暫定。融資歷史只採用次一交易日「前日餘額」校正後的數值。恐慌：上市＋上櫃下跌家數占比與指數單日跌幅的歷史百分位平均。每日比較至少60筆歷史樣本；開戶成長率至少12個前期月度樣本。"
     }
   },
-  "historyCount": 181,
+  "historyCount": 182,
   "accountHistoryCount": 17,
   "history": [
     {
@@ -3591,6 +3591,23 @@
       "fearIndex": 39,
       "breadthCoverage": "上市＋上櫃",
       "marginPriorBalanceYi": 4341.37987,
+      "marginBalanceFinalized": false
+    },
+    {
+      "date": "2026-11-27",
+      "close": 39308.08,
+      "changePct": 0.4,
+      "advance": 1787,
+      "decline": 2672,
+      "unchanged": 512,
+      "marginBalanceYi": 4301.71978,
+      "marginChangePct": -0.9925551402209409,
+      "daytradeSharePct": 31.5,
+      "accountMonth": "2026-10",
+      "heatIndex": 45,
+      "fearIndex": 76,
+      "breadthCoverage": "上市＋上櫃",
+      "marginPriorBalanceYi": 4344.84476,
       "marginBalanceFinalized": false
     }
   ],
